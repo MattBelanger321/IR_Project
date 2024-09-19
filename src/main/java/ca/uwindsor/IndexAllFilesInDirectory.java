@@ -1,7 +1,10 @@
-
+package ca.uwindsor;
 //adapted/simplified from luecene.demo.IndexFiles
 // Jianguo Lu, Dec 2016
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -9,13 +12,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.*;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
@@ -25,16 +30,23 @@ import org.apache.lucene.store.FSDirectory;
 public class IndexAllFilesInDirectory {
 	static int counter = 0;
 
-	public static void main(String[] args) throws Exception {
-		String indexPath = "citeceer2_index";
-		String docsPath = "citeceer2";
-		System.out.println("Indexing to directory '" + indexPath + "'...");
-		Directory dir = FSDirectory.open(Paths.get(indexPath));
-		Analyzer analyzer = new StandardAnalyzer();
-		IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
-		IndexWriter writer = new IndexWriter(dir, iwc);
-		indexDocs(writer, Paths.get(docsPath));
-		writer.close();
+	public static void main(String[] args)  {
+		try {
+			String indexPath = "citeceer2_index";
+			String docsPath = "citeceer2";
+			System.out.println("Indexing to directory '" + indexPath + "'...");
+			Directory dir;
+
+			dir = FSDirectory.open(Paths.get(indexPath));
+
+			Analyzer analyzer = new StandardAnalyzer();
+			IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+			IndexWriter writer = new IndexWriter(dir, iwc);
+			indexDocs(writer, Paths.get(docsPath));
+			writer.close();
+		} catch (IOException e) {
+			System.out.println(e);
+		}
 	}
 
 	static void indexDocs(final IndexWriter writer, Path path) throws IOException {

@@ -34,3 +34,7 @@ bin/
 # Do not push the citeceer2 data.
 citeceer2
 citeceer2_index
+
+*.idea
+*.iml
+*target
