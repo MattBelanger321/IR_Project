@@ -25,6 +25,7 @@ public class SearchIndexedDocs {
 		TopDocs results = searcher.search(query, 5);
 		System.out.println(results.totalHits + " total matching documents");
 		for (int i = 0; i < 5 && i < results.scoreDocs.length; i++) {
+			@SuppressWarnings("deprecation")
 			Document doc = searcher.doc(results.scoreDocs[i].doc);
 			String path = doc.get("path");
 			System.out.println((i + 1) + ". " + path);
