@@ -1,10 +1,9 @@
-package ca.uwindsor;
+package ca.uwindsor.common;
 
 /**
  * Store constants for the project.
  */
-public class Constants
-{
+public class Constants {
     /**
      * The name of the data to use.
      */
@@ -21,7 +20,8 @@ public class Constants
     public static final String keyTerms = "terms.txt";
 
     /**
-     * How many of the starting lines (after the first for the title) should be indexed.
+     * How many of the starting lines (after the first for the title) should be
+     * indexed.
      * This can be used to help capture author names or keywords for instance.
      */
     public static final int indexedLines = 10;
