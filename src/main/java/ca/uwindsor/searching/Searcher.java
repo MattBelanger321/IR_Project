@@ -1,4 +1,4 @@
-package ca.uwindsor;
+package ca.uwindsor.searching;
 
 import java.nio.file.Paths;
 
@@ -13,14 +13,15 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
 
+import ca.uwindsor.common.Constants;
+import ca.uwindsor.indexing.ComputerScienceAnalyzer;
+
 /**
  * Simplified Lucene Search .
  * Based on code by Jianguo Lu.
  */
-public class Searcher
-{
-	public static void main(String[] args) throws Exception
-	{
+public class Searcher {
+	public static void main(String[] args) throws Exception {
 		// Load the indexed files.
 		IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(Constants.dataIndex)));
 		IndexSearcher searcher = new IndexSearcher(reader);

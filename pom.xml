@@ -32,7 +32,7 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
-                            <mainClass>ca.uwindsor.Indexer</mainClass> <!-- First main class -->
+                            <mainClass>ca.uwindsor.indexing.Indexer</mainClass> <!-- First main class -->
                         </configuration>
                     </execution>
                     <!-- Execution for the second main class -->
@@ -42,7 +42,7 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
-                            <mainClass>ca.uwindsor.Searcher</mainClass> <!-- Second main class -->
+                            <mainClass>ca.uwindsor.searching.Searcher</mainClass> <!-- Second main class -->
                         </configuration>
                     </execution>
                 </executions>
