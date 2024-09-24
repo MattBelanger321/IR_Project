@@ -1,9 +1,6 @@
 package ca.uwindsor.indexing;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -12,10 +9,13 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 
+import ca.uwindsor.analyzing.ComputerScienceAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.*;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
@@ -34,27 +34,35 @@ public class Indexer
 	private static int counter = 0;
 
 	/**
-	 * Store the computer science terms.
+	 * Custom field used for the keywords only section.
 	 */
-	private static HashSet<String> terms;
+	private static FieldType keywordsField;
 
 	/**
 	 * Run the indexing.
-	 * 
 	 * @param args Nothing.
 	 * @throws IOException If a file reading error occurs during execution.
 	 */
 	public static void main(String[] args) throws IOException
 	{
-		// Load the terms.
-		terms = Constants.getTerms();
+		// Define our custom field to store the frequency of terms.
+		keywordsField = new FieldType(TextField.TYPE_STORED);
+		keywordsField.setStoreTermVectors(true);
+		keywordsField.setStoreTermVectorPositions(true);
+		keywordsField.setStoreTermVectorOffsets(true);
+		keywordsField.setTokenized(true);
+		keywordsField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+
+		// Create the override analyzer for the content field to only match computer science terms.
+		Map<String, Analyzer> overrides = new HashMap<>();
+		overrides.put(Constants.FieldKeywords, new ComputerScienceAnalyzer(true));
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
 				// The root path for the directory to index.
 				FSDirectory.open(Paths.get(Constants.dataIndex)),
-				// Use our custom analyzer.
-				new IndexWriterConfig(new ComputerScienceAnalyzer()));
+				// Set the default analyzer to match everything and override for the keywords.
+				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
 
 		// Loop over all files to index.
 		Files.walkFileTree(Paths.get(Constants.data), new SimpleFileVisitor<Path>() {
@@ -71,126 +79,53 @@ public class Indexer
 
 	/**
 	 * Indexes a single document.
-	 * 
 	 * @param writer The index to write to.
 	 * @param file   The file to index.
 	 * @throws IOException If the file cannot be read for indexing.
 	 */
 	static void indexDoc(IndexWriter writer, Path file) throws IOException
 	{
-		// Open the readers for the file.
+		// Read the file.
 		InputStream stream = Files.newInputStream(file);
 		InputStreamReader inputStreamReader = new InputStreamReader(stream, StandardCharsets.UTF_8);
-		BufferedReader br = new BufferedReader(inputStreamReader);
+		BufferedReader reader = new BufferedReader(inputStreamReader);
 
-		// We will index the title.
-		String title = null;
+		// The title is the first line.
+		String title = reader.readLine();
 
-		// Let us store the initial details of the file.
-		// This should capture author names for instance.
-		StringBuilder details = new StringBuilder();
-
-		// Store the entire text of the document for processing later.
-		StringBuilder text = new StringBuilder();
-
-		// How many lines have been counted so far for the initial indexing.
-		int lineCount = 0;
-
-		// Read the entire file.
+		// Read all lines and also start capturing the computer science terms.
 		String line;
-		while ((line = br.readLine()) != null)
+		StringBuilder contents = new StringBuilder();
+		while ((line = reader.readLine()) != null)
 		{
-			// Get the title which should be indexed.
-			if (title == null)
-			{
-				title = line;
-			}
-
-			// We do not care for empty lines.
-			if (!line.isEmpty())
-			{
-				// Check if this line should be fully indexed.
-				if (lineCount < Constants.indexedLines)
-				{
-					// Ensure we are not starting with an empty space.
-					if (details.length() > 0)
-					{
-						details.append(" ");
-					}
-					details.append(line);
-				}
-
-				// Store the entire, regular text.
-				if (text.length() > 0)
-				{
-					text.append(" ");
-				}
-				text.append(line);
-			}
-
-			lineCount++;
+			contents.append(line).append(System.lineSeparator());
 		}
 
 		// Build the indexed Lucene document.
 		Document doc = new Document();
-		doc.add(new StringField("path", file.toString(), Field.Store.YES));
-		doc.add(new StringField("title", title == null ? "" : title, Field.Store.YES));
-		doc.add(new StringField("details", details.toString(), Field.Store.YES));
-		doc.add(new TextField("contents", br));
 
-		// Store the terms that have been found throughout the entire text.
-		for (Map.Entry<String, Integer> entry : GetTermFrequency(text).entrySet())
-		{
-			doc.add(new TextField("term", entry.getKey(), Field.Store.YES));
-			doc.add(new IntField("frequency", entry.getValue(), Field.Store.YES));
-		}
+		// The path and title are stored as entire strings.
+		doc.add(new StringField(Constants.FieldPath, file.toString(), Field.Store.YES));
+		doc.add(new StringField(Constants.FieldTitle, title == null ? "" : title, Field.Store.YES));
+
+		// The contents are tokenized normally.
+		doc.add(new TextField(Constants.FieldContents, contents.length() == 0 ? "" : contents.toString(), Field.Store.NO));
+
+		// The keywords are stored noting their frequency.
+		doc.add(new Field(Constants.FieldKeywords, contents.length() == 0 ? "" : contents.toString(), keywordsField));
 
 		// Index the document.
 		writer.addDocument(doc);
 
-		// Close the readers for the file.
-		br.close();
+		// Cleanup the readers.
+		reader.close();
 		inputStreamReader.close();
 		stream.close();
 
 		// Track some output.
-		counter++;
-		if (counter % 1000 == 0)
+		if (++counter % 1000 == 0)
 		{
-			System.out.println("Indexing file " + counter + ": " + file.getFileName());
+			System.out.println("Indexing file " + counter);
 		}
-	}
-
-	/**
-	 * Get how frequent terms occur.
-	 * @param text The text read from a file.
-	 * @return The HashMap of the terms and their frequency.
-	 */
-	private static Map<String, Integer> GetTermFrequency(StringBuilder text)
-	{
-		// Convert the text to a string.
-		String content = text.toString();
-		for (String term : terms)
-		{
-			// For the terms we want to ensure are not split, replace the space with an underscore.
-			String modifiedTerm = term.replace(' ', '_');
-			content = content.replaceAll("\\b" + term + "\\b", modifiedTerm);
-		}
-
-		// Get the found terms in the text.
-		Map<String, Integer> foundTerms = new HashMap<>();
-
-		// Ensure we split every word, but not the "_" we have added.
-		for (String word : content.split("(?<!\\S)\\s+"))
-		{
-			// Convert the placeholders back to the actual terms.
-			String term = word.replace('_', ' ').toLowerCase();
-			if (terms.contains(term))
-			{
-				foundTerms.put(term, foundTerms.getOrDefault(term, 0) + 1);
-			}
-		}
-
-		return foundTerms;
 	}
 }
