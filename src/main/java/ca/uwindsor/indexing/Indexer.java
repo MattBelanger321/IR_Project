@@ -65,9 +65,11 @@ public class Indexer
 				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
 
 		// Loop over all files to index.
-		Files.walkFileTree(Paths.get(Constants.data), new SimpleFileVisitor<Path>() {
+		Files.walkFileTree(Paths.get(Constants.data), new SimpleFileVisitor<Path>()
+		{
 			// Visit the file and index it.
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
+			{
 				indexDoc(writer, file);
 				return FileVisitResult.CONTINUE;
 			}
