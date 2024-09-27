@@ -56,19 +56,20 @@ public class Indexer
 
 		// Create the override analyzer for the content field to only match computer science terms.
 		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FieldKeywords, new KeyTermsAnalyzer());
+		overrides.put(Constants.FIELD_KEYWORDS, new KeyTermsAnalyzer());
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
 				// The root path for the directory to index.
-				FSDirectory.open(Paths.get(Constants.dataIndex)),
+				FSDirectory.open(Paths.get(Constants.DATA_INDEX)),
 				// Set the default analyzer to match everything and override for the keywords.
 				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new StandardAnalyzer(), overrides)));
 
 		// Loop over all files to index.
-		Files.walkFileTree(Paths.get(Constants.data), new SimpleFileVisitor<Path>()
+		Files.walkFileTree(Paths.get(Constants.DATA), new SimpleFileVisitor<Path>()
 		{
 			// Visit the file and index it.
+            @Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
 			{
 				indexDoc(writer, file);
@@ -108,16 +109,16 @@ public class Indexer
 		Document doc = new Document();
 
 		// The path and title are stored as entire strings.
-		doc.add(new StringField(Constants.FieldPath, file.toString(), Field.Store.YES));
-		doc.add(new StringField(Constants.FieldTitle, title, Field.Store.YES));
+		doc.add(new StringField(Constants.FIELD_PATH, file.toString(), Field.Store.YES));
+		doc.add(new StringField(Constants.FIELD_TITLE, title, Field.Store.YES));
 
 		if (contents.length() > 0)
 		{
 			// The contents are tokenized normally.
-			doc.add(new TextField(Constants.FieldContents, contents.toString(), Field.Store.NO));
+			doc.add(new TextField(Constants.FIELD_CONTENTS, contents.toString(), Field.Store.NO));
 
 			// The keywords are stored noting their frequency.
-			doc.add(new Field(Constants.FieldKeywords, contents.toString(), counterField));
+			doc.add(new Field(Constants.FIELD_KEYWORDS, contents.toString(), counterField));
 		}
 
 		// Index the document.

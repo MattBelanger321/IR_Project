@@ -48,9 +48,8 @@ public class KeyTermsFilter extends TokenFilter
         // Define our custom terms.
         terms = new HashSet<>();
 
-        try
-        {
-            BufferedReader br = new BufferedReader(new FileReader(Constants.keyTerms));
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(Constants.KEY_TERMS));
             // Read the file, with a new term on each line.
             String line;
             while ((line = br.readLine()) != null)
@@ -58,8 +57,7 @@ public class KeyTermsFilter extends TokenFilter
                 terms.add(line.trim().toLowerCase());
             }
             br.close();
-        } catch (IOException e)
-        {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

@@ -32,7 +32,7 @@ public class Searcher
 		String request = "artificial intelligence and machine learning concepts";
 
 		// Load the indexed files.
-		IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(Constants.dataIndex)));
+		IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(Constants.DATA_INDEX)));
 		IndexSearcher searcher = new IndexSearcher(reader);
 
 		// Get the top five results.
@@ -62,7 +62,7 @@ public class Searcher
 
 			// Get how many times keywords are in a document for seeing how the matching is working.
 			@SuppressWarnings("deprecation")
-			Terms terms = reader.getTermVector(results.scoreDocs[i].doc, Constants.FieldKeywords);
+			Terms terms = reader.getTermVector(results.scoreDocs[i].doc, Constants.FIELD_KEYWORDS);
 			if (terms != null)
 			{
 				// Access the terms for this field.
@@ -136,7 +136,7 @@ public class Searcher
 	 */
 	private static Query ContentsQuery(String request) throws ParseException
     {
-		return new QueryParser(Constants.FieldContents, new StandardAnalyzer()).parse(request);
+		return new QueryParser(Constants.FIELD_CONTENTS, new StandardAnalyzer()).parse(request);
 	}
 
 	/**
@@ -147,6 +147,6 @@ public class Searcher
 	 */
 	private static Query KeywordsQuery(String request) throws ParseException
 	{
-		return new QueryParser(Constants.FieldKeywords, new KeyTermsAnalyzer()).parse(request);
+		return new QueryParser(Constants.FIELD_KEYWORDS, new KeyTermsAnalyzer()).parse(request);
 	}
 }
