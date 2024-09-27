@@ -11,9 +11,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 
-import ca.uwindsor.analyzing.ComputerScienceAnalyzer;
+import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
@@ -36,7 +37,7 @@ public class Indexer
 	/**
 	 * Custom field used for the keywords only section.
 	 */
-	private static FieldType keywordsField;
+	private static FieldType counterField;
 
 	/**
 	 * Run the indexing.
@@ -46,23 +47,23 @@ public class Indexer
 	public static void main(String[] args) throws IOException
 	{
 		// Define our custom field to store the frequency of terms.
-		keywordsField = new FieldType(TextField.TYPE_STORED);
-		keywordsField.setStoreTermVectors(true);
-		keywordsField.setStoreTermVectorPositions(true);
-		keywordsField.setStoreTermVectorOffsets(true);
-		keywordsField.setTokenized(true);
-		keywordsField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+		counterField = new FieldType(TextField.TYPE_STORED);
+		counterField.setStoreTermVectors(true);
+		counterField.setStoreTermVectorPositions(true);
+		counterField.setStoreTermVectorOffsets(true);
+		counterField.setTokenized(true);
+		counterField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
 
 		// Create the override analyzer for the content field to only match computer science terms.
 		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FieldKeywords, new ComputerScienceAnalyzer(true));
+		overrides.put(Constants.FieldKeywords, new KeyTermsAnalyzer());
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
 				// The root path for the directory to index.
 				FSDirectory.open(Paths.get(Constants.dataIndex)),
 				// Set the default analyzer to match everything and override for the keywords.
-				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
+				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new StandardAnalyzer(), overrides)));
 
 		// Loop over all files to index.
 		Files.walkFileTree(Paths.get(Constants.data), new SimpleFileVisitor<Path>()
@@ -97,7 +98,7 @@ public class Indexer
 
 		// Read all lines and also start capturing the computer science terms.
 		String line;
-		StringBuilder contents = new StringBuilder();
+		StringBuilder contents = new StringBuilder(title);
 		while ((line = reader.readLine()) != null)
 		{
 			contents.append(line).append(System.lineSeparator());
@@ -108,13 +109,16 @@ public class Indexer
 
 		// The path and title are stored as entire strings.
 		doc.add(new StringField(Constants.FieldPath, file.toString(), Field.Store.YES));
-		doc.add(new StringField(Constants.FieldTitle, title == null ? "" : title, Field.Store.YES));
+		doc.add(new StringField(Constants.FieldTitle, title, Field.Store.YES));
 
-		// The contents are tokenized normally.
-		doc.add(new TextField(Constants.FieldContents, contents.length() == 0 ? "" : contents.toString(), Field.Store.NO));
+		if (contents.length() > 0)
+		{
+			// The contents are tokenized normally.
+			doc.add(new TextField(Constants.FieldContents, contents.toString(), Field.Store.NO));
 
-		// The keywords are stored noting their frequency.
-		doc.add(new Field(Constants.FieldKeywords, contents.length() == 0 ? "" : contents.toString(), keywordsField));
+			// The keywords are stored noting their frequency.
+			doc.add(new Field(Constants.FieldKeywords, contents.toString(), counterField));
+		}
 
 		// Index the document.
 		writer.addDocument(doc);
