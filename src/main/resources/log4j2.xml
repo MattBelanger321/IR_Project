@@ -10,7 +10,7 @@
         </Console>
 
         <!-- File Appender for TRACE level and above -->
-        <File name="FileLogger" fileName="logs/app.log">
+        <File name="FileLogger" fileName="logs/app.log" append="false">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
             <Filters>
                 <ThresholdFilter level="trace" onMatch="ACCEPT" onMismatch="DENY"/>
