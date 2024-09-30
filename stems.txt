@@ -1,4 +1,4 @@
-algoritm
+algo
 search
 sort
 optim

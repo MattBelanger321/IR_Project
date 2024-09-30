@@ -54,9 +54,11 @@ public class StemmerSample {
 	/**
 	 * Custom field used for the keywords only section.
 	 */
-	private static FieldType counterField;
+	private static FieldType stemmerField;
 
 	private static final String INDEX_PATH = "stemmer_sample_index";
+	// this is here for debugging purposes, i run the analysis after indexing to prove it works
+	private static ComputerScienceAnalyzer csAnalyzer;
 
 	/**
 	 * This application indexs the data using the stemmer for debugging purposes
@@ -66,12 +68,12 @@ public class StemmerSample {
 	public static void main(String[] args) throws IOException
 	{
 		// Define our custom field to store the frequency of terms.
-		counterField = new FieldType(TextField.TYPE_STORED);
-		counterField.setStoreTermVectors(true);
-		counterField.setStoreTermVectorPositions(true);
-		counterField.setStoreTermVectorOffsets(true);
-		counterField.setTokenized(true);
-		counterField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+		stemmerField = new FieldType(TextField.TYPE_STORED);
+		stemmerField.setStoreTermVectors(true);
+		stemmerField.setStoreTermVectorPositions(true);
+		stemmerField.setStoreTermVectorOffsets(true);
+		stemmerField.setTokenized(true);
+		stemmerField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
 
 		indexStems();
 		writeStemmedDocument("stemmed.txt");	// print the stemmed doucment to a file
@@ -82,7 +84,8 @@ public class StemmerSample {
 	public static void indexStems() throws IOException{
 		// Create the override analyzer for the content field to only match computer science terms.
 		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FieldNames.STEMMED_CONTENTS.getValue(), new ComputerScienceAnalyzer());
+		csAnalyzer = new ComputerScienceAnalyzer();
+		overrides.put(Constants.FieldNames.STEMMED_CONTENTS.getValue(), csAnalyzer);
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
@@ -103,7 +106,7 @@ public class StemmerSample {
 				{
 					logger.debug("Indexing file #" + counter + ": " + file.toString());
 				}else{
-					logger.trace("Indexing file #" + counter + ": " + file.toString());
+					logger.debug("Indexing file #" + counter + ": " + file.toString());
 				}
 
 				indexDoc(writer, file);
@@ -113,7 +116,7 @@ public class StemmerSample {
 				{
 					logger.info("Indexed file #" + counter + ": " + file.toString());
 				}else{
-					logger.trace("Indexed file #" + counter + ": " + file.toString());
+					logger.debug("Indexed file #" + counter + ": " + file.toString());
 				}
 				return FileVisitResult.CONTINUE;
 			}
@@ -143,28 +146,28 @@ public class StemmerSample {
 		String line;
 		StringBuilder contents = new StringBuilder(title);
 		contents.append(System.lineSeparator());
-		logger.trace("Reading file...");
+		logger.debug("Reading file...");
 		while ((line = reader.readLine()) != null)
 		{
 			contents.append(line).append(System.lineSeparator());
 		}
-		logger.trace("Read file.");
+		logger.debug("Read file.");
 
 		// Build the indexed Lucene document.
 		Document doc = new Document();
-		logger.trace("Adding Fields to Document...");
-		if (contents.length() > 0)
+		logger.debug("Adding Fields to Document...");
+		if (contents.toString().length() > 0)
 		{
 			doc.add(new StringField(Constants.FieldNames.TITLE.getValue(), title, Field.Store.YES));
 			// The contents are tokenized normally.
-			doc.add(new TextField(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), Field.Store.NO));
+			doc.add(new Field(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), stemmerField));
 		}
-		logger.trace("Added Fields");
+		logger.debug("Added Fields");
 
 		// Index the document.
-		logger.trace("Adding Document to Index...");
+		logger.debug("Adding Document to Index...");
 		writer.addDocument(doc);
-		logger.trace("Added Document");
+		logger.debug("Added Document");
 
 		// Cleanup the readers.
 		reader.close();
@@ -182,31 +185,38 @@ public class StemmerSample {
 
             // Build a query to find the document by title
             QueryParser parser = new QueryParser(Constants.FieldNames.TITLE.getValue(), new StandardAnalyzer());
-            Query query = parser.parse("Collaborative Decision-making Processes for");
+            Query query = parser.parse("Consistent hierarchies of nonlinear abstractions");
 
             // Search for the document
             TopDocs results = searcher.search(query, 1); // Limiting to 1 result
             ScoreDoc[] hits = results.scoreDocs;
 
             if (hits.length > 0) {
+				logger.info(hits.length + " hits for query");
+
                 // Get the document
                 Document doc = searcher.doc(hits[0].doc);
-                String stemmedContents = doc.get(Constants.FieldNames.STEMMED_CONTENTS.getValue());
+                String stemmedContents = csAnalyzer.analyzeText(Constants.FieldNames.STEMMED_CONTENTS.getValue(), doc.get(Constants.FieldNames.STEMMED_CONTENTS.getValue()));
 
                 // Write the "stemmed_contents" field to the specified file
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(stemmedtxt))) {
-                    writer.write(stemmedContents);
-                }
-
-                System.out.println("Stemmed contents written to file: " + stemmedtxt);
+				if(stemmedContents != null && !stemmedContents.isEmpty()){
+                	try (BufferedWriter writer = new BufferedWriter(new FileWriter(stemmedtxt))) {
+                    	writer.write(stemmedContents);
+                	}
+                	logger.info("Stemmed contents written to file: " + stemmedtxt);
+				}else if (stemmedContents == null){
+					logger.error("stemmed contents string is null");
+				}else if (stemmedContents.isEmpty()){
+					logger.error("stemmed contents string is empty");
+				}
             } else {
-                System.out.println("Document not found.");
+                logger.error("Document not found.");
             }
 
             // Close the reader
             reader.close();
         } catch (IOException | ParseException e) {
-			System.out.println(e);
+			logger.error(e);
         }
     }
 }

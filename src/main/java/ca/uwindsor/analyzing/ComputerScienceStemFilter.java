@@ -10,10 +10,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.en.PorterStemFilter;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-
-import ca.uwindsor.sample_apps.StemmerSample;
 
 
 public class ComputerScienceStemFilter extends TokenFilter {
@@ -22,13 +19,11 @@ public class ComputerScienceStemFilter extends TokenFilter {
 
     private final CharTermAttribute termAttr;
     
-    private final PorterStemFilter porterStemFilter;    // this class provides basic stemming features
     private final Set<String> csStems;  // this set holds the stems
 
     public ComputerScienceStemFilter(TokenStream input, String stemsFilePath){
         super(input);
 		termAttr = addAttribute(CharTermAttribute.class);
-        this.porterStemFilter = new PorterStemFilter(input);
         this.csStems = new HashSet<>();
         initCustomStems(stemsFilePath);
         logger.info("Constructed CS Stem Filter");
@@ -49,19 +44,26 @@ public class ComputerScienceStemFilter extends TokenFilter {
         }
     }
 
-    // returns a stemmed version of term or throws if term does not match and csStems
-    private String stemCSToken(String term) throws StemNotFoundException {
+    // returns a stemmed version of term or returns original term
+    private String stemCSToken(String term)  {
         for (String csStem : csStems) {
-            if (csStem.startsWith(term)) {
+            if (term.startsWith(csStem)) {
                 return csStem; // Found a string that starts with the prefix
             }
         }
-        throw new StemNotFoundException("No stems found starting with: " + term); // No strings found that start with the prefix
+        return term;
     }
 
 
     @Override
     public final boolean incrementToken() throws IOException {
+
+        // First, check if there is another token to process
+        if (!input.incrementToken()) {
+            logger.debug("StemFilter Reached End of Stream");
+            return false; // No more tokens, end of stream
+        }
+
         String term = termAttr.toString();
         // Check if the term is in the custom stems set
 
@@ -69,19 +71,14 @@ public class ComputerScienceStemFilter extends TokenFilter {
             logger.debug("StemFilter Reached End of Stream");
             return false; // No valid term to process
         }
-
-        try {
-            String stemmedTerm = stemCSToken(term);
-            // Set the modified term back to termAttr
-            termAttr.setEmpty().append(stemmedTerm); // Set the new term
-            
-            logger.debug("Replaced \"" + term + "\" with \"" + stemmedTerm + "\".");
-
-            return true;
-        } catch (StemNotFoundException e) {
-            // Apply Porter stemming if not a custom stem
-            logger.trace("Porter Stemmed \"" + term + "\".");
-            return porterStemFilter.incrementToken();
-        }
+      
+        logger.trace("Checking term if \"" + term + "\" can be CS Stemmed");
+        String stemmedTerm = stemCSToken(term);
+        // Set the modified term back to termAttr
+        termAttr.setEmpty().append(stemmedTerm); // Set the new term
+        
+        if(!stemmedTerm.equals(term))
+            logger.trace("Replaced \"" + term + "\" with \"" + stemmedTerm + "\".");
+        return true;
     }
 }

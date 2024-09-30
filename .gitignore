@@ -40,3 +40,4 @@ citeceer2_index
 *target
 stemmer_sample_index/
 logs/
+stemmed.txt
