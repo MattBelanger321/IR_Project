@@ -38,3 +38,6 @@ citeceer2_index
 *.idea
 *.iml
 *target
+stemmer_sample_index/
+logs/
+stemmed.txt

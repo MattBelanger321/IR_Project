@@ -21,22 +21,28 @@ public class Constants
     public static final String KEY_TERMS = "terms.txt";
 
     /**
-     * The name of the field path.
+     * The file containing key computer science stems.
      */
-    public static final String FIELD_PATH = "path";
+    public static final String STEMS_FILE = "stems.txt";
 
-    /**
-     * The name of the title path.
+    /*
+     * Document Field Names
      */
-    public static final String FIELD_TITLE = "title";
-
-    /**
-     * The name of the content's path.
-     */
-    public static final String FIELD_CONTENTS = "contents";
-
-    /**
-     * The name of the keyword's path.
-     */
-    public static final String FIELD_KEYWORDS = "keywords";
+    public enum FieldNames {
+        PATH("path"),   // the path to this document on the server
+        TITLE("title"), // the title of the document
+        CONTENTS("contents"),   // the contents of the document
+        STEMMED_CONTENTS("stemmed_contents"),   // the stemmed contents of the document
+        KEYWORDS("keywords");   // the number of keywords in the document
+    
+        private final String value; // the instance of this enum that the instaniated enum is holding
+    
+        FieldNames(String value) {
+            this.value = value;
+        }
+    
+        public String getValue() {  // the string contents of this enum
+            return value;
+        }
+    }
 }

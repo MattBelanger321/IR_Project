@@ -1,6 +1,9 @@
 package ca.uwindsor.indexing;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -11,16 +14,20 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 
-import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.*;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
 
+import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import ca.uwindsor.common.Constants;
 
 /**
@@ -56,7 +63,7 @@ public class Indexer
 
 		// Create the override analyzer for the content field to only match computer science terms.
 		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FIELD_KEYWORDS, new KeyTermsAnalyzer());
+		overrides.put(Constants.FieldNames.KEYWORDS.getValue(), new KeyTermsAnalyzer());
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
@@ -109,16 +116,16 @@ public class Indexer
 		Document doc = new Document();
 
 		// The path and title are stored as entire strings.
-		doc.add(new StringField(Constants.FIELD_PATH, file.toString(), Field.Store.YES));
-		doc.add(new StringField(Constants.FIELD_TITLE, title, Field.Store.YES));
+		doc.add(new StringField(Constants.FieldNames.PATH.getValue(), file.toString(), Field.Store.YES));
+		doc.add(new StringField(Constants.FieldNames.TITLE.getValue(), title, Field.Store.YES));
 
 		if (contents.length() > 0)
 		{
 			// The contents are tokenized normally.
-			doc.add(new TextField(Constants.FIELD_CONTENTS, contents.toString(), Field.Store.NO));
+			doc.add(new TextField(Constants.FieldNames.CONTENTS.getValue(), contents.toString(), Field.Store.NO));
 
 			// The keywords are stored noting their frequency.
-			doc.add(new Field(Constants.FIELD_KEYWORDS, contents.toString(), counterField));
+			doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), counterField));
 		}
 
 		// Index the document.

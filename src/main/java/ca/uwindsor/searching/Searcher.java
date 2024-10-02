@@ -3,17 +3,24 @@ package ca.uwindsor.searching;
 import java.io.IOException;
 import java.nio.file.Paths;
 
-import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.index.*;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.*;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
-
-import ca.uwindsor.common.Constants;
 import org.apache.lucene.util.BytesRef;
+
+import ca.uwindsor.analyzing.KeyTermsAnalyzer;
+import ca.uwindsor.common.Constants;
 
 /**
  * Simplified Lucene Search.
@@ -62,7 +69,7 @@ public class Searcher
 
 			// Get how many times keywords are in a document for seeing how the matching is working.
 			@SuppressWarnings("deprecation")
-			Terms terms = reader.getTermVector(results.scoreDocs[i].doc, Constants.FIELD_KEYWORDS);
+			Terms terms = reader.getTermVector(results.scoreDocs[i].doc, Constants.FieldNames.KEYWORDS.getValue());
 			if (terms != null)
 			{
 				// Access the terms for this field.
@@ -136,7 +143,7 @@ public class Searcher
 	 */
 	private static Query ContentsQuery(String request) throws ParseException
     {
-		return new QueryParser(Constants.FIELD_CONTENTS, new StandardAnalyzer()).parse(request);
+		return new QueryParser(Constants.FieldNames.CONTENTS.getValue(), new StandardAnalyzer()).parse(request);
 	}
 
 	/**
@@ -147,6 +154,6 @@ public class Searcher
 	 */
 	private static Query KeywordsQuery(String request) throws ParseException
 	{
-		return new QueryParser(Constants.FIELD_KEYWORDS, new KeyTermsAnalyzer()).parse(request);
+		return new QueryParser(Constants.FieldNames.KEYWORDS.getValue(), new KeyTermsAnalyzer()).parse(request);
 	}
 }
