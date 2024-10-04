@@ -35,9 +35,12 @@ bin/
 citeceer2
 citeceer2_index
 
+# Do not save logs.
+logs
+
+# Do not save the stem sample files from the searcher.
+Stems
+
 *.idea
 *.iml
 *target
-stemmer_sample_index/
-logs/
-stemmed.txt

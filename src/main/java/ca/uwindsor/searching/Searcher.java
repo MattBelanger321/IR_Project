@@ -1,9 +1,14 @@
 package ca.uwindsor.searching;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import ca.uwindsor.analyzing.ComputerScienceAnalyzer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -19,7 +24,6 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 
-import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import ca.uwindsor.common.Constants;
 
 /**
@@ -28,6 +32,9 @@ import ca.uwindsor.common.Constants;
  */
 public class Searcher
 {
+	// the logger used for this class
+	private static final Logger logger = LogManager.getLogger(Searcher.class);
+
 	/**
 	 * Run some searching.
 	 * @param args For now, these are not used and the request is hardcoded.
@@ -43,14 +50,24 @@ public class Searcher
 		IndexSearcher searcher = new IndexSearcher(reader);
 
 		// Get the top five results.
-		// Swap the method for which way we want to search.
-		// The options are "ContentsSearch", "KeywordsSearch", or "CombinedSearch".
-		// Eventually, we can try doing a method which uses one metric and then another as a fallback.
-		// For instance, maybe use keywords only to start, and if nothing/little returns we can do the rest standard.
-		TopDocs results = KeywordsSearch(searcher, request, 5);
+		TopDocs results = CombinedSearch(searcher, request, 5);
+
+		// Helper to check the stemmed files.
+		ComputerScienceAnalyzer stemmedChecker = new ComputerScienceAnalyzer(false);
+
+		// Ensure the folder to save stemmed results exists.
+		String stemsFolder = "Stems";
+		File directory = new File(stemsFolder);
+		if (!directory.exists())
+		{
+			if (!directory.mkdir())
+			{
+				logger.error("Failed to create stems directory.");
+			}
+		}
 
 		// Output details of the files we returned.
-		System.out.println(results.totalHits + " total matching documents");
+		logger.info(results.totalHits + " total matching documents.");
 		for (int i = 0; i < 5 && i < results.scoreDocs.length; i++)
 		{
 			// We should look into other methods to avoid deprecation, but everything I read say to use this...
@@ -58,13 +75,13 @@ public class Searcher
 			Document doc = searcher.doc(results.scoreDocs[i].doc);
 
 			// Write the path to the file.
-			System.out.println((i + 1) + ". " + doc.get("path"));
+			logger.info("File " + (i + 1) + " - " + doc.get("path"));
 
 			// Write the title.
 			String title = doc.get("title");
 			if (title != null)
 			{
-				System.out.println("   Title: " + doc.get("title"));
+				logger.info("Title: " + doc.get("title"));
 			}
 
 			// Get how many times keywords are in a document for seeing how the matching is working.
@@ -80,9 +97,32 @@ public class Searcher
 				while ((term = termsEnum.next()) != null)
 				{
 					// Get the frequency of the term in the document.
-					System.out.println("   " + term.utf8ToString() + " = " + (int) termsEnum.totalTermFreq());
+					logger.info(term.utf8ToString() + " = " + (int) termsEnum.totalTermFreq());
 				}
 			}
+
+			// Get the document.
+			String stemmedContents = stemmedChecker.analyzeText(Constants.FieldNames.STEMMED_CONTENTS.getValue(), doc.get(Constants.FieldNames.STEMMED_CONTENTS.getValue()));
+
+			// Write the "stemmed_contents" field to the specified file.
+			if (stemmedContents != null && !stemmedContents.isEmpty())
+			{
+				String output = "Stemmed " + (i + 1) + ".txt";
+
+				try (BufferedWriter writer = new BufferedWriter(new FileWriter(stemsFolder + "/" + output)))
+				{
+					writer.write(stemmedContents);
+				}
+				logger.info("Stemmed contents written to file " + output);
+			}
+			else if (stemmedContents == null)
+			{
+				logger.error("Stemmed contents string is null.");
+			}
+			else
+            {
+                logger.error("Stemmed contents string is empty.");
+            }
 		}
 
 		// Cleanup the reader.
@@ -100,15 +140,17 @@ public class Searcher
 	 */
 	private static TopDocs CombinedSearch(IndexSearcher searcher, String request, int number) throws IOException, ParseException
     {
-		// Add both searches, treating them similar to a logical "OR".
+		// Add all searches, treating them similar to a logical "OR".
 		BooleanQuery.Builder builder = new BooleanQuery.Builder();
-		builder.add(ContentsQuery(request), BooleanClause.Occur.SHOULD);
+		builder.add(TitleQuery(request), BooleanClause.Occur.SHOULD);
+		builder.add(ContentsQuery(request, true), BooleanClause.Occur.SHOULD);
+		builder.add(ContentsQuery(request, false), BooleanClause.Occur.SHOULD);
 		builder.add(KeywordsQuery(request), BooleanClause.Occur.SHOULD);
 		return searcher.search(builder.build(), number);
 	}
 
 	/**
-	 * Run a search using the contents.
+	 * Run a search using the title.
 	 * @param searcher The searcher.
 	 * @param request The request we want to search for.
 	 * @param number The number of results we want.
@@ -116,9 +158,24 @@ public class Searcher
 	 * @throws IOException Error reading the indexed documents.
 	 * @throws ParseException Error parsing the requested search.
 	 */
-	private static TopDocs ContentsSearch(IndexSearcher searcher, String request, int number) throws IOException, ParseException
+	private static TopDocs TitleSearch(IndexSearcher searcher, String request, int number) throws IOException, ParseException
+	{
+		return searcher.search(TitleQuery(request), number);
+	}
+
+	/**
+	 * Run a search using the contents.
+	 * @param searcher The searcher.
+	 * @param request The request we want to search for.
+	 * @param number The number of results we want.
+	 * @param stemmed If the stemmed contents should be searched.
+	 * @return The top results matching the request.
+	 * @throws IOException Error reading the indexed documents.
+	 * @throws ParseException Error parsing the requested search.
+	 */
+	private static TopDocs ContentsSearch(IndexSearcher searcher, String request, int number, Boolean stemmed) throws IOException, ParseException
     {
-		return searcher.search(ContentsQuery(request), number);
+		return searcher.search(ContentsQuery(request, stemmed), number);
 	}
 
 	/**
@@ -136,14 +193,26 @@ public class Searcher
 	}
 
 	/**
-	 * Create a query for the contents.
+	 * Create a query for the title.
 	 * @param request The request we want to search for.
 	 * @return The query.
 	 * @throws ParseException Error parsing the requested search.
 	 */
-	private static Query ContentsQuery(String request) throws ParseException
+	private static Query TitleQuery(String request) throws ParseException
+	{
+		return new QueryParser(Constants.FieldNames.TITLE.getValue(), new ComputerScienceAnalyzer(false)).parse(request);
+	}
+
+	/**
+	 * Create a query for the contents.
+	 * @param request The request we want to search for.
+	 * @param stemmed If the stemmed contents should be searched.
+	 * @return The query.
+	 * @throws ParseException Error parsing the requested search.
+	 */
+	private static Query ContentsQuery(String request, Boolean stemmed) throws ParseException
     {
-		return new QueryParser(Constants.FieldNames.CONTENTS.getValue(), new StandardAnalyzer()).parse(request);
+		return new QueryParser(stemmed ? Constants.FieldNames.STEMMED_CONTENTS.getValue() : Constants.FieldNames.CONTENTS.getValue(), new ComputerScienceAnalyzer(false)).parse(request);
 	}
 
 	/**
@@ -154,6 +223,6 @@ public class Searcher
 	 */
 	private static Query KeywordsQuery(String request) throws ParseException
 	{
-		return new QueryParser(Constants.FieldNames.KEYWORDS.getValue(), new KeyTermsAnalyzer()).parse(request);
+		return new QueryParser(Constants.FieldNames.KEYWORDS.getValue(), new ComputerScienceAnalyzer(true)).parse(request);
 	}
 }

@@ -1,6 +1,8 @@
 package ca.uwindsor.analyzing;
 
 import ca.uwindsor.common.Constants;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
@@ -18,6 +20,11 @@ import java.util.HashSet;
 public class KeyTermsFilter extends TokenFilter
 {
     /**
+     * The logger used for this class.
+     */
+    private static final Logger logger = LogManager.getLogger(KeyTermsFilter.class);
+
+    /**
      * The terms to match.
      */
     private static HashSet<String> terms;
@@ -34,32 +41,38 @@ public class KeyTermsFilter extends TokenFilter
 
     /**
      * Create the filter.
+     * @param input The previous token streams prior to this.
      */
     public KeyTermsFilter(TokenStream input)
     {
         super(input);
 
         // If the terms have not yet been loaded, load them.
-        if (terms != null)
+        if (terms == null)
         {
-            return;
-        }
+            // Define our custom terms.
+            terms = new HashSet<>();
 
-        // Define our custom terms.
-        terms = new HashSet<>();
-
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(Constants.KEY_TERMS));
-            // Read the file, with a new term on each line.
-            String line;
-            while ((line = br.readLine()) != null)
+            try
             {
-                terms.add(line.trim().toLowerCase());
+                BufferedReader br = new BufferedReader(new FileReader(Constants.KEY_TERMS));
+                // Read the file, with a new term on each line.
+                String line;
+                while ((line = br.readLine()) != null)
+                {
+                    String term = line.trim().toLowerCase();
+                    logger.debug("Added \"" + term + "\" to terms list.");
+                    terms.add(term);
+                }
+                br.close();
             }
-            br.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
         }
+
+        logger.info("Constructed Key Terms Filter.");
     }
 
     /**
@@ -79,6 +92,7 @@ public class KeyTermsFilter extends TokenFilter
                 // If there are no more tokens to load we are done.
                 if (!input.incrementToken())
                 {
+                    logger.debug("Reached end of stream.");
                     return false;
                 }
 
@@ -92,6 +106,7 @@ public class KeyTermsFilter extends TokenFilter
             // Check if this is a term we wish to match.
             if (terms.contains(currentPhrase))
             {
+                logger.debug("Matched the key term \"" + currentPhrase + "\".");
                 termAttr.setEmpty().append(currentPhrase);
                 buffer.clear();
                 return true;
@@ -101,6 +116,7 @@ public class KeyTermsFilter extends TokenFilter
             if (!isPotentialTerm(currentPhrase))
             {
                 // This is not a match and no potential for it to be part of a larger one so clear it.
+                logger.debug("Discarding the start of \"" + currentPhrase + "\" as it is not part of a key term.");
                 buffer.removeFirst();
                 continue;
             }
@@ -109,10 +125,12 @@ public class KeyTermsFilter extends TokenFilter
             if (input.incrementToken())
             {
                 buffer.addLast(termAttr.toString());
+                logger.debug("Extended the key term to \"" + currentPhrase + "\".");
                 continue;
             }
 
             // Otherwise, there are no more tokens so stop.
+            logger.debug("Finished the stream.");
             buffer.clear();
             return false;
         }
