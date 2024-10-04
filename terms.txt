@@ -1,2 +1,315 @@
 ﻿artificial intelligence
 machine learning
+large language model
+algorithm
+data structure
+database
+recursion
+computational complexity
+data mining
+cryptography
+cybersecurity
+network protocol
+distributed systems
+cloud computing
+operating system
+software engineering
+natural language processing
+object-oriented programming
+functional programming
+data science
+big data
+computer vision
+neural network
+deep learning
+fuzzy logic
+genetic algorithm
+internet of things
+blockchain
+virtualization
+augmented reality
+virtual reality
+game development
+embedded systems
+concurrency
+multithreading
+parallel computing
+compiler
+interpreter
+scripting language
+markup language
+syntax
+semantics
+source code
+version control
+git
+data encryption
+hash function
+data compression
+cache
+buffer
+memory management
+garbage collection
+virtual memory
+firmware
+bootloader
+kernel
+application programming interface
+command line interface
+graphical user interface
+data packet
+firewall
+load balancing
+proxy server
+domain name system
+uniform resource locator
+hypertext transfer protocol
+secure hypertext transfer protocol
+simple mail transfer protocol
+file transfer protocol
+secure shell
+hypervisor
+docker
+containerization
+microservices
+representational state transfer
+websocket
+asynchronous programming
+event-driven programming
+middleware
+web framework
+content management system
+responsive design
+front-end development
+back-end development
+full-stack development
+single-page application
+progressive web app
+responsive design
+cross-browser compatibility
+continuous integration
+continuous deployment
+unit testing
+integration testing
+regression testing
+test-driven development
+behavior-driven development
+user experience
+user interface
+human-computer interaction
+agile methodology
+scrum
+kanban
+software development lifecycle
+requirements engineering
+software architecture
+design patterns
+singleton pattern
+factory pattern
+observer pattern
+model-view-controller
+stateful vs stateless
+session management
+cookies
+token-based authentication
+open authorization
+json web token
+extensible markup language
+javascript object notation
+yet another markup language
+parsing
+serialization
+deserialization
+object-relational mapping
+relational database management system
+structured query language
+non-relational database
+document-based database
+in-memory data structure store
+search engine database
+graph database
+distributed storage
+cloud platform
+public cloud service
+private cloud service
+container orchestration
+infrastructure as code
+configuration management
+terraform
+development and operations
+site reliability engineering
+observability
+logging
+monitoring
+tracing
+performance optimization
+data warehouse
+data lake
+extract transform load
+business intelligence
+machine learning model
+feature engineering
+hyperparameter tuning
+cross-validation
+supervised learning
+unsupervised learning
+reinforcement learning
+classification
+regression
+clustering
+dimensionality reduction
+principal component analysis
+support vector machine
+decision tree
+random forest
+k-nearest neighbors
+gradient boosting
+extreme gradient boosting
+neural architecture search
+transfer learning
+word embedding
+tokenization
+bag-of-words
+transformer model
+attention mechanism
+recurrent neural network
+long short-term memory
+gated recurrent unit
+convolutional neural network
+activation function
+loss function
+optimization algorithm
+gradient descent
+backpropagation
+dropout
+batch normalization
+epoch
+mini-batch
+overfitting
+underfitting
+regularization
+model evaluation
+confusion matrix
+precision
+recall
+f1 score
+receiver operating characteristic curve
+area under curve
+bayesian inference
+monte carlo simulation
+stochastic process
+markov chain
+game theory
+automata theory
+turing machine
+finite state machine
+context-free grammar
+regular expression
+regular expression parsing
+lexical analysis
+syntax tree
+abstract syntax tree
+bytecode
+runtime
+compiler optimization
+just-in-time compilation
+garbage collector
+memory leak
+stack overflow
+heap allocation
+pointer
+pointer arithmetic
+null reference
+dangling pointer
+smart pointer
+exception handling
+mutual exclusion
+semaphore
+deadlock
+race condition
+thread safety
+asynchronous input output
+message passing
+event loop
+publish-subscribe pattern
+observer pattern
+factory pattern
+proxy pattern
+adapter pattern
+strategy pattern
+decorator pattern
+visitor pattern
+builder pattern
+iterator pattern
+command pattern
+facade pattern
+bridge pattern
+flyweight pattern
+memento pattern
+composite pattern
+dependency injection
+inversion of control
+mocking
+stubbing
+sandbox environment
+virtual private network
+penetration testing
+ethical hacking
+phishing
+man-in-the-middle attack
+structured query language injection
+cross-site scripting
+cross-site request forgery
+denial of service
+distributed denial of service
+public key infrastructure
+digital certificate
+certificate authority
+secure sockets layer
+transport layer security
+pretty good privacy
+advanced encryption standard
+rivest-shamir-adleman algorithm
+diffie-hellman key exchange
+elliptic curve cryptography
+hash-based message authentication code
+public key cryptography
+symmetric encryption
+asymmetric encryption
+security token
+biometrics
+authentication
+authorization
+access control
+identity and access management
+role-based access control
+zero trust security
+incident response
+vulnerability assessment
+network topology
+mesh network
+peer-to-peer
+client-server model
+subnetting
+internet protocol version 4
+internet protocol version 6
+network address translation
+bandwidth
+latency
+packet switching
+circuit switching
+fiber optics
+ethernet
+wireless networking
+bluetooth
+wireless personal area network
+near field communication
+universal serial bus
+transmission control protocol internet protocol
+open systems interconnection model
+layer 2 switching
+layer 3 routing
+dynamic host configuration protocol
+network time protocol
+simple network management protocol
+voice over internet protocol

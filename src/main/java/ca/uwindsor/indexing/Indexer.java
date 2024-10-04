@@ -14,9 +14,11 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 
+import ca.uwindsor.analyzing.ComputerScienceAnalyzer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
@@ -27,7 +29,6 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
 
-import ca.uwindsor.analyzing.KeyTermsAnalyzer;
 import ca.uwindsor.common.Constants;
 
 /**
@@ -37,6 +38,11 @@ import ca.uwindsor.common.Constants;
 public class Indexer
 {
 	/**
+	 * The logger used for this class.
+	 */
+	private static final Logger logger = LogManager.getLogger(Indexer.class);
+
+	/**
 	 * Count how many files have been indexed.
 	 */
 	private static int counter = 0;
@@ -44,7 +50,7 @@ public class Indexer
 	/**
 	 * Custom field used for the keywords only section.
 	 */
-	private static FieldType counterField;
+	private static FieldType storeAll;
 
 	/**
 	 * Run the indexing.
@@ -54,32 +60,60 @@ public class Indexer
 	public static void main(String[] args) throws IOException
 	{
 		// Define our custom field to store the frequency of terms.
-		counterField = new FieldType(TextField.TYPE_STORED);
-		counterField.setStoreTermVectors(true);
-		counterField.setStoreTermVectorPositions(true);
-		counterField.setStoreTermVectorOffsets(true);
-		counterField.setTokenized(true);
-		counterField.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+		storeAll = new FieldType(TextField.TYPE_STORED);
+		storeAll.setStoreTermVectors(true);
+		storeAll.setStoreTermVectorPositions(true);
+		storeAll.setStoreTermVectorOffsets(true);
+		storeAll.setTokenized(true);
+		storeAll.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
 
 		// Create the override analyzer for the content field to only match computer science terms.
 		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FieldNames.KEYWORDS.getValue(), new KeyTermsAnalyzer());
+		overrides.put(Constants.FieldNames.KEYWORDS.getValue(), new ComputerScienceAnalyzer(true));
 
 		// Writer for our indexing.
 		IndexWriter writer = new IndexWriter(
 				// The root path for the directory to index.
 				FSDirectory.open(Paths.get(Constants.DATA_INDEX)),
-				// Set the default analyzer to match everything and override for the keywords.
-				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new StandardAnalyzer(), overrides)));
+				// Set the default analyzer to match words, and our override for keywords.
+				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
 
 		// Loop over all files to index.
 		Files.walkFileTree(Paths.get(Constants.DATA), new SimpleFileVisitor<Path>()
 		{
 			// Visit the file and index it.
             @Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
-			{
-				indexDoc(writer, file);
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+            {
+				boolean fullLog = ++counter % 1000 == 0;
+
+				if (fullLog)
+				{
+					logger.info("Indexing file #" + counter + ": " + file);
+				}
+				else
+				{
+					logger.debug("Indexing file #" + counter + ": " + file);
+				}
+
+				try
+				{
+					indexDoc(writer, file);
+				}
+				catch (Exception e)
+				{
+					logger.error(e);
+				}
+
+				if (fullLog)
+				{
+					logger.info("Indexed file #" + counter + ": " + file);
+				}
+				else
+				{
+					logger.debug("Indexed file #" + counter + ": " + file);
+				}
+
 				return FileVisitResult.CONTINUE;
 			}
 		});
@@ -125,7 +159,10 @@ public class Indexer
 			doc.add(new TextField(Constants.FieldNames.CONTENTS.getValue(), contents.toString(), Field.Store.NO));
 
 			// The keywords are stored noting their frequency.
-			doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), counterField));
+			doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), storeAll));
+
+			// The contents are tokenized using the custom stemming.
+			doc.add(new Field(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), storeAll));
 		}
 
 		// Index the document.
@@ -135,11 +172,5 @@ public class Indexer
 		reader.close();
 		inputStreamReader.close();
 		stream.close();
-
-		// Track some output.
-		if (++counter % 1000 == 0)
-		{
-			System.out.println("Indexing file " + counter);
-		}
 	}
 }
