@@ -2,6 +2,7 @@ package ca.uwindsor.analyzing;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Collection;
 import java.util.TreeSet;
 
 import ca.uwindsor.common.TermsCollection;
@@ -38,17 +39,17 @@ public class ComputerScienceAnalyzer extends Analyzer
     /**
      * Loaded stems.
      */
-    private final TreeSet<String> stems;
+    private static TreeSet<String> stems = null;
 
     /**
      * Loaded keywords.
      */
-    private final TreeSet<String> keywords;
+    private static TreeSet<String> keywords = null;
 
     /**
      * Loaded abbreviations.
      */
-    private SynonymMap abbreviations;
+    private static SynonymMap abbreviations = null;
 
     /**
      * Set up the custom analyzer.
@@ -59,6 +60,12 @@ public class ComputerScienceAnalyzer extends Analyzer
     {
         // Store if we are only interested in key terms.
         this.keyTermsOnly = keyTermsOnly;
+
+        // Nothing to do if the terms have already been loaded.
+        if (stems != null && keywords != null && abbreviations != null)
+        {
+            return;
+        }
 
         // Load the stems.
         stems = new TreeSet<>();
@@ -78,12 +85,36 @@ public class ComputerScienceAnalyzer extends Analyzer
             splits[0] = splits[0].trim();
 
             // Check if something stems this keyword.
-            keyword = TermsCollection.StringStartsWith(stems, splits[0], false);
+            try (Analyzer analyzer = new Analyzer()
+            {
+                @Override
+                protected TokenStreamComponents createComponents(String fieldName)
+                {
+                    // The base is the standard tokenizer.
+                    Tokenizer tokenizer = new StandardTokenizer();
 
-            // If there is no stem, use the keyword itself.
-            if (keyword == null)
+                    // Perform our base tokenization.
+                    return new TokenStreamComponents(tokenizer, baseTokenStream(tokenizer, stems));
+                }
+            })
+            {
+                TokenStream stream = analyzer.tokenStream(null, splits[0]);
+                StringBuilder sb = new StringBuilder();
+                CharTermAttribute attr = stream.addAttribute(CharTermAttribute.class);
+                stream.reset();
+
+                // Stem each part of the term.
+                while (stream.incrementToken())
+                {
+                    sb.append(attr.toString()).append(" ");
+                }
+                stream.end();
+                stream.close();
+                keyword = sb.toString().trim();
+            } catch (IOException e)
             {
                 keyword = splits[0];
+                logger.error(e);
             }
 
             // If there is a map, the keyword is actually just the abbreviation and map this to the term.
@@ -92,12 +123,15 @@ public class ComputerScienceAnalyzer extends Analyzer
                 String abbreviation = splits[1].trim();
                 keywords.add(abbreviation);
                 builder.add(new CharsRef(keyword), new CharsRef(abbreviation), true);
+                //logger.debug("Keyword = " + abbreviation + " | Abbreviation = " + keyword + " to " + abbreviation);
             } else
             {
                 keywords.add(keyword);
+                //logger.debug("Keyword = " + keyword);
             }
         }
 
+        // Set up the abbreviations.
         try
         {
             abbreviations = builder.build();
@@ -119,11 +153,8 @@ public class ComputerScienceAnalyzer extends Analyzer
         // The base is the standard tokenizer.
         Tokenizer tokenizer = new StandardTokenizer();
 
-        // Ensure we are in lowercase.
-        TokenStream tokenStream = new LowerCaseFilter(tokenizer);
-
-        // Perform our custom stemming followed by the porter stemmer on top of it.
-        tokenStream = new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
+        // Perform our base tokenization.
+        TokenStream tokenStream = baseTokenStream(tokenizer, stems);
 
         // Reduce any keywords to their abbreviations.
         tokenStream = new SynonymGraphFilter(tokenStream, abbreviations, true);
@@ -136,6 +167,22 @@ public class ComputerScienceAnalyzer extends Analyzer
 
         // Otherwise, return everything.
         return new TokenStreamComponents(tokenizer, tokenStream);
+    }
+
+    /**
+     * The base part of the tokenization, both during initialization and the indexing and searching.
+     *
+     * @param tokenizer  The tokenizer to use.
+     * @param collection The collection of terms.
+     * @return The core lowercase and stemming portion of the pipeline.
+     */
+    private static TokenStream baseTokenStream(Tokenizer tokenizer, Collection<String> collection)
+    {
+        // Ensure we are in lowercase.
+        TokenStream tokenStream = new LowerCaseFilter(tokenizer);
+
+        // Perform our custom stemming followed by the porter stemmer on top of it.
+        return new PorterStemFilter(new CustomStemFilter(tokenStream, collection));
     }
 
     /**
