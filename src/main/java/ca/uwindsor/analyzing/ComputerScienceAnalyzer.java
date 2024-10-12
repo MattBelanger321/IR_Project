@@ -2,16 +2,23 @@ package ca.uwindsor.analyzing;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.TreeSet;
 
+import ca.uwindsor.common.TermsCollection;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.core.LowerCaseFilter;
 import org.apache.lucene.analysis.en.PorterStemFilter;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
+import org.apache.lucene.analysis.synonym.SynonymGraphFilter;
+import org.apache.lucene.analysis.synonym.SynonymMap;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 import ca.uwindsor.common.Constants;
+import org.apache.lucene.util.CharsRef;
 
 /**
  * Implement custom logic for tokenizing and stemming.
@@ -19,9 +26,29 @@ import ca.uwindsor.common.Constants;
 public class ComputerScienceAnalyzer extends Analyzer
 {
     /**
-     * Store if this analyzer should only use key terms or not.
+     * The logger used for this class.
      */
-    private final Boolean keywordsOnly;
+    private static final Logger logger = LogManager.getLogger(ComputerScienceAnalyzer.class);
+
+    /**
+     * If this should look for key terms only.
+     */
+    private final boolean keyTermsOnly;
+
+    /**
+     * Loaded stems.
+     */
+    private final TreeSet<String> stems;
+
+    /**
+     * Loaded keywords.
+     */
+    private final TreeSet<String> keywords;
+
+    /**
+     * Loaded abbreviations.
+     */
+    private SynonymMap abbreviations;
 
     /**
      * Set up the custom analyzer.
@@ -30,7 +57,54 @@ public class ComputerScienceAnalyzer extends Analyzer
      */
     public ComputerScienceAnalyzer(Boolean keyTermsOnly)
     {
-        this.keywordsOnly = keyTermsOnly;
+        // Store if we are only interested in key terms.
+        this.keyTermsOnly = keyTermsOnly;
+
+        // Load the stems.
+        stems = new TreeSet<>();
+        TermsCollection.Load(stems, Constants.STEMS_FILE);
+
+        // Load the keywords which will still need parsing.
+        TreeSet<String> initialKeywords = new TreeSet<>();
+        TermsCollection.Load(initialKeywords, Constants.KEY_TERMS);
+
+        // Build the actual keywords and abbreviations mapping.
+        keywords = new TreeSet<>();
+        SynonymMap.Builder builder = new SynonymMap.Builder(true);
+        for (String keyword : initialKeywords)
+        {
+            // Keywords split on the pipe symbol represent an abbreviation.
+            String[] splits = keyword.split("\\|");
+            splits[0] = splits[0].trim();
+
+            // Check if something stems this keyword.
+            keyword = TermsCollection.StringStartsWith(stems, splits[0], false);
+
+            // If there is no stem, use the keyword itself.
+            if (keyword == null)
+            {
+                keyword = splits[0];
+            }
+
+            // If there is a map, the keyword is actually just the abbreviation and map this to the term.
+            if (splits.length > 1)
+            {
+                String abbreviation = splits[1].trim();
+                keywords.add(abbreviation);
+                builder.add(new CharsRef(keyword), new CharsRef(abbreviation), true);
+            } else
+            {
+                keywords.add(keyword);
+            }
+        }
+
+        try
+        {
+            abbreviations = builder.build();
+        } catch (IOException e)
+        {
+            logger.error(e);
+        }
     }
 
     /**
@@ -48,12 +122,20 @@ public class ComputerScienceAnalyzer extends Analyzer
         // Ensure we are in lowercase.
         TokenStream tokenStream = new LowerCaseFilter(tokenizer);
 
-        // From here, we select if this is only for the keywords or for everything with will use a custom stemmer.
-        return new TokenStreamComponents(tokenizer, keywordsOnly
-                // Keywords only.
-                ? new KeyTermsFilter(tokenStream, Constants.KEY_TERMS)
-                // Use a custom stemmer for the full text, and if that does not match anything, the porter stemmer.
-                : new PorterStemFilter(new CustomStemFilter(tokenStream, Constants.STEMS_FILE)));
+        // Perform our custom stemming followed by the porter stemmer on top of it.
+        tokenStream = new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
+
+        // Reduce any keywords to their abbreviations.
+        tokenStream = new SynonymGraphFilter(tokenStream, abbreviations, true);
+
+        // If only interested in the keywords, filter it to just them.
+        if (keyTermsOnly)
+        {
+            return new TokenStreamComponents(tokenizer, new KeyTermsFilter(tokenStream, keywords));
+        }
+
+        // Otherwise, return everything.
+        return new TokenStreamComponents(tokenizer, tokenStream);
     }
 
     /**
