@@ -25,23 +25,55 @@ public class Constants
      */
     public static final String STEMS_FILE = "stems.txt";
 
-    /*
-     * Document Field Names
+    /**
+     * Document field names.
      */
-    public enum FieldNames {
-        PATH("path"),   // the path to this document on the server
-        TITLE("title"), // the title of the document
-        CONTENTS("contents"),   // the contents of the document
-        STEMMED_CONTENTS("stemmed_contents"),   // the stemmed contents of the document
-        KEYWORDS("keywords");   // the number of keywords in the document
-    
-        private final String value; // the instance of this enum that the instaniated enum is holding
-    
-        FieldNames(String value) {
+    public enum FieldNames
+    {
+        /**
+         * The path to this document on the server.
+         */
+        PATH("path"),
+
+        /**
+         * The title of the document.
+         */
+        TITLE("title"),
+
+        /**
+         * The contents of the document.
+         */
+        CONTENTS("contents"),
+
+        /**
+         * The stemmed contents of the document.
+         */
+        STEMMED_CONTENTS("stemmed_contents"),
+
+        /**
+         * The keywords in the document.
+         */
+        KEYWORDS("keywords");
+
+        /**
+         * The instance of this enum that the instantiated enum is holding.
+         */
+        private final String value;
+
+        /**
+         * Create a new field name.
+         * @param value The value for it.
+         */
+        FieldNames(String value)
+        {
             this.value = value;
         }
-    
-        public String getValue() {  // the string contents of this enum
+
+        /**
+         * Get the string contents of this enum.
+         */
+        public String getValue()
+        {
             return value;
         }
     }

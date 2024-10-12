@@ -37,140 +37,126 @@ import ca.uwindsor.common.Constants;
  */
 public class Indexer
 {
-	/**
-	 * The logger used for this class.
-	 */
-	private static final Logger logger = LogManager.getLogger(Indexer.class);
+    /**
+     * The logger used for this class.
+     */
+    private static final Logger logger = LogManager.getLogger(Indexer.class);
 
-	/**
-	 * Count how many files have been indexed.
-	 */
-	private static int counter = 0;
+    /**
+     * Count how many files have been indexed.
+     */
+    private static int counter = 0;
 
-	/**
-	 * Custom field used for the keywords only section.
-	 */
-	private static FieldType storeAll;
+    /**
+     * Custom field used for the keywords only section.
+     */
+    private static FieldType storeAll;
 
-	/**
-	 * Run the indexing.
-	 * @param args Nothing.
-	 * @throws IOException If a file reading error occurs during execution.
-	 */
-	public static void main(String[] args) throws IOException
-	{
-		// Define our custom field to store the frequency of terms.
-		storeAll = new FieldType(TextField.TYPE_STORED);
-		storeAll.setStoreTermVectors(true);
-		storeAll.setStoreTermVectorPositions(true);
-		storeAll.setStoreTermVectorOffsets(true);
-		storeAll.setTokenized(true);
-		storeAll.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+    /**
+     * Run the indexing.
+     *
+     * @param args Nothing.
+     * @throws IOException If a file reading error occurs during execution.
+     */
+    public static void main(String[] args) throws IOException
+    {
+        // Define our custom field to store the frequency of terms.
+        storeAll = new FieldType(TextField.TYPE_STORED);
+        storeAll.setStoreTermVectors(true);
+        storeAll.setStoreTermVectorPositions(true);
+        storeAll.setStoreTermVectorOffsets(true);
+        storeAll.setTokenized(true);
+        storeAll.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
 
-		// Create the override analyzer for the content field to only match computer science terms.
-		Map<String, Analyzer> overrides = new HashMap<>();
-		overrides.put(Constants.FieldNames.KEYWORDS.getValue(), new ComputerScienceAnalyzer(true));
+        // Create the override analyzer for the content field to only match computer science terms.
+        Map<String, Analyzer> overrides = new HashMap<>();
+        overrides.put(Constants.FieldNames.KEYWORDS.getValue(), new ComputerScienceAnalyzer(true));
 
-		// Writer for our indexing.
-		IndexWriter writer = new IndexWriter(
-				// The root path for the directory to index.
-				FSDirectory.open(Paths.get(Constants.DATA_INDEX)),
-				// Set the default analyzer to match words, and our override for keywords.
-				new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
+        // Writer for our indexing.
+        IndexWriter writer = new IndexWriter(
+                // The root path for the directory to index.
+                FSDirectory.open(Paths.get(Constants.DATA_INDEX)),
+                // Set the default analyzer to match words, and our override for keywords.
+                new IndexWriterConfig(new PerFieldAnalyzerWrapper(new ComputerScienceAnalyzer(false), overrides)));
 
-		// Loop over all files to index.
-		Files.walkFileTree(Paths.get(Constants.DATA), new SimpleFileVisitor<Path>()
-		{
-			// Visit the file and index it.
+        // Loop over all files to index.
+        Files.walkFileTree(Paths.get(Constants.DATA), new SimpleFileVisitor<Path>()
+        {
+            // Visit the file and index it.
             @Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
             {
-				boolean fullLog = ++counter % 1000 == 0;
+                try
+                {
+                    indexDoc(writer, file);
+                } catch (Exception e)
+                {
+                    logger.error(e);
+                }
 
-				if (fullLog)
-				{
-					logger.info("Indexing file #" + counter + ": " + file);
-				}
-				else
-				{
-					logger.debug("Indexing file #" + counter + ": " + file);
-				}
+                if (++counter % 1000 == 0)
+                {
+                    logger.info("Indexed file #" + counter + ": " + file);
+                }
 
-				try
-				{
-					indexDoc(writer, file);
-				}
-				catch (Exception e)
-				{
-					logger.error(e);
-				}
+                return FileVisitResult.CONTINUE;
+            }
+        });
 
-				if (fullLog)
-				{
-					logger.info("Indexed file #" + counter + ": " + file);
-				}
-				else
-				{
-					logger.debug("Indexed file #" + counter + ": " + file);
-				}
+        // Cleanup by closing the index writer.
+        writer.close();
+    }
 
-				return FileVisitResult.CONTINUE;
-			}
-		});
+    /**
+     * Indexes a single document.
+     *
+     * @param writer The index to write to.
+     * @param file   The file to index.
+     * @throws IOException If the file cannot be read for indexing.
+     */
+    static void indexDoc(IndexWriter writer, Path file) throws IOException
+    {
+        // Read the file.
+        InputStream stream = Files.newInputStream(file);
+        InputStreamReader inputStreamReader = new InputStreamReader(stream, StandardCharsets.UTF_8);
+        BufferedReader reader = new BufferedReader(inputStreamReader);
 
-		// Cleanup by closing the index writer.
-		writer.close();
-	}
+        // The title is the first line.
+        String title = reader.readLine();
 
-	/**
-	 * Indexes a single document.
-	 * @param writer The index to write to.
-	 * @param file   The file to index.
-	 * @throws IOException If the file cannot be read for indexing.
-	 */
-	static void indexDoc(IndexWriter writer, Path file) throws IOException
-	{
-		// Read the file.
-		InputStream stream = Files.newInputStream(file);
-		InputStreamReader inputStreamReader = new InputStreamReader(stream, StandardCharsets.UTF_8);
-		BufferedReader reader = new BufferedReader(inputStreamReader);
+        // Read all lines and also start capturing the computer science terms.
+        String line;
+        StringBuilder contents = new StringBuilder(title);
+        while ((line = reader.readLine()) != null)
+        {
+            contents.append(line).append(System.lineSeparator());
+        }
 
-		// The title is the first line.
-		String title = reader.readLine();
+        // Build the indexed Lucene document.
+        Document doc = new Document();
 
-		// Read all lines and also start capturing the computer science terms.
-		String line;
-		StringBuilder contents = new StringBuilder(title);
-		while ((line = reader.readLine()) != null)
-		{
-			contents.append(line).append(System.lineSeparator());
-		}
+        // The path and title are stored as entire strings.
+        doc.add(new StringField(Constants.FieldNames.PATH.getValue(), file.toString(), Field.Store.YES));
+        doc.add(new StringField(Constants.FieldNames.TITLE.getValue(), title, Field.Store.YES));
 
-		// Build the indexed Lucene document.
-		Document doc = new Document();
+        if (contents.length() > 0)
+        {
+            // The contents are tokenized normally.
+            doc.add(new TextField(Constants.FieldNames.CONTENTS.getValue(), contents.toString(), Field.Store.NO));
 
-		// The path and title are stored as entire strings.
-		doc.add(new StringField(Constants.FieldNames.PATH.getValue(), file.toString(), Field.Store.YES));
-		doc.add(new StringField(Constants.FieldNames.TITLE.getValue(), title, Field.Store.YES));
+            // The keywords are stored noting their frequency.
+            doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), storeAll));
 
-		if (contents.length() > 0)
-		{
-			// The contents are tokenized normally.
-			doc.add(new TextField(Constants.FieldNames.CONTENTS.getValue(), contents.toString(), Field.Store.NO));
+            // The contents are tokenized using the custom stemming.
+            doc.add(new Field(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), storeAll));
+        }
 
-			// The keywords are stored noting their frequency.
-			doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), storeAll));
+        // Index the document.
+        writer.addDocument(doc);
 
-			// The contents are tokenized using the custom stemming.
-			doc.add(new Field(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), storeAll));
-		}
-
-		// Index the document.
-		writer.addDocument(doc);
-
-		// Cleanup the readers.
-		reader.close();
-		inputStreamReader.close();
-		stream.close();
-	}
+        // Cleanup the readers.
+        reader.close();
+        inputStreamReader.close();
+        stream.close();
+    }
 }

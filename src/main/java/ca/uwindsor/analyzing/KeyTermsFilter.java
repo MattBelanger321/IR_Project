@@ -1,34 +1,18 @@
 package ca.uwindsor.analyzing;
 
-import ca.uwindsor.common.Constants;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
-import java.util.HashSet;
 
 /**
  * Filter for key terms.
  */
-public class KeyTermsFilter extends TokenFilter
+public class KeyTermsFilter extends SetTokenFilter
 {
-    /**
-     * The logger used for this class.
-     */
-    private static final Logger logger = LogManager.getLogger(KeyTermsFilter.class);
-
-    /**
-     * The terms to match.
-     */
-    private static HashSet<String> terms;
-
     /**
      * Required value for the tokenizing.
      */
@@ -40,43 +24,77 @@ public class KeyTermsFilter extends TokenFilter
     private final Deque<String> buffer = new ArrayDeque<>();
 
     /**
-     * Create the filter.
-     * @param input The previous token streams prior to this.
+     * Do not add any terms and creates a hash set to store term.
+     *
+     * @param input The input stream.
      */
     public KeyTermsFilter(TokenStream input)
     {
         super(input);
+    }
 
-        // If the terms have not yet been loaded, load them.
-        if (terms == null)
-        {
-            // Define our custom terms.
-            terms = new HashSet<>();
+    /**
+     * Start with an existing set.
+     *
+     * @param input The input stream.
+     * @param set   The starting set.
+     */
+    public KeyTermsFilter(TokenStream input, Collection<String> set)
+    {
+        super(input, set);
+    }
 
-            try
-            {
-                BufferedReader br = new BufferedReader(new FileReader(Constants.KEY_TERMS));
-                // Read the file, with a new term on each line.
-                String line;
-                while ((line = br.readLine()) != null)
-                {
-                    String term = line.trim().toLowerCase();
-                    logger.debug("Added \"" + term + "\" to terms list.");
-                    terms.add(term);
-                }
-                br.close();
-            }
-            catch (IOException e)
-            {
-                throw new RuntimeException(e);
-            }
-        }
+    /**
+     * Add terms from a file which will be normalized into a hash set.
+     *
+     * @param input The input stream.
+     * @param path  The path to the file.
+     */
+    public KeyTermsFilter(TokenStream input, String path)
+    {
+        super(input, path);
+    }
 
-        logger.info("Constructed Key Terms Filter.");
+    /**
+     * Add terms from a file into a hash set.
+     *
+     * @param input     The input stream.
+     * @param path      The path to the file.
+     * @param normalize If the terms should be normalized or not.
+     */
+    public KeyTermsFilter(TokenStream input, String path, Boolean normalize)
+    {
+        super(input, path, normalize);
+    }
+
+    /**
+     * Add terms from a file which will be normalized into an existing set.
+     *
+     * @param input The input stream.
+     * @param set   The starting set.
+     * @param path  The path to the file.
+     */
+    public KeyTermsFilter(TokenStream input, Collection<String> set, String path)
+    {
+        super(input, set, path);
+    }
+
+    /**
+     * Add terms from a file into an existing set.
+     *
+     * @param input     The input stream.
+     * @param set       The starting set.
+     * @param path      The path to the file.
+     * @param normalize If the terms should be normalized or not.
+     */
+    public KeyTermsFilter(TokenStream input, Collection<String> set, String path, Boolean normalize)
+    {
+        super(input, set, path, normalize);
     }
 
     /**
      * See if we should increment the number of tokens.
+     *
      * @return True if a key term was matched, false otherwise.
      * @throws IOException Reading the input fails.
      */
@@ -92,7 +110,6 @@ public class KeyTermsFilter extends TokenFilter
                 // If there are no more tokens to load we are done.
                 if (!input.incrementToken())
                 {
-                    logger.debug("Reached end of stream.");
                     return false;
                 }
 
@@ -104,19 +121,17 @@ public class KeyTermsFilter extends TokenFilter
             String currentPhrase = String.join(" ", buffer);
 
             // Check if this is a term we wish to match.
-            if (terms.contains(currentPhrase))
+            if (Contains(currentPhrase, false))
             {
-                logger.debug("Matched the key term \"" + currentPhrase + "\".");
                 termAttr.setEmpty().append(currentPhrase);
                 buffer.clear();
                 return true;
             }
 
             // Check if there is any way this buffer could be a term.
-            if (!isPotentialTerm(currentPhrase))
+            if (SetStartsWith(currentPhrase, false) == null)
             {
                 // This is not a match and no potential for it to be part of a larger one so clear it.
-                logger.debug("Discarding the start of \"" + currentPhrase + "\" as it is not part of a key term.");
                 buffer.removeFirst();
                 continue;
             }
@@ -125,37 +140,18 @@ public class KeyTermsFilter extends TokenFilter
             if (input.incrementToken())
             {
                 buffer.addLast(termAttr.toString());
-                logger.debug("Extended the key term to \"" + currentPhrase + "\".");
                 continue;
             }
 
             // Otherwise, there are no more tokens so stop.
-            logger.debug("Finished the stream.");
             buffer.clear();
             return false;
         }
     }
 
     /**
-     * Check if there is any potential the current buffer could be a term.
-     * @param currentPhrase The current phrase.
-     * @return True if there is potential, false otherwise.
-     */
-    private boolean isPotentialTerm(String currentPhrase)
-    {
-        for (String phrase : terms)
-        {
-            if (phrase.startsWith(currentPhrase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Reset the buffer.
+     *
      * @throws IOException Any errors from resetting.
      */
     @Override

@@ -3,8 +3,6 @@ package ca.uwindsor.analyzing;
 import java.io.IOException;
 import java.io.StringReader;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
@@ -21,28 +19,23 @@ import ca.uwindsor.common.Constants;
 public class ComputerScienceAnalyzer extends Analyzer
 {
     /**
-     * The logger used for this class.
-     */
-    private static final Logger logger = LogManager.getLogger(ComputerScienceAnalyzer.class);
-
-    /**
      * Store if this analyzer should only use key terms or not.
      */
     private final Boolean keywordsOnly;
 
     /**
      * Set up the custom analyzer.
+     *
      * @param keyTermsOnly Whether this analyzer should only use key terms or not.
      */
     public ComputerScienceAnalyzer(Boolean keyTermsOnly)
     {
         this.keywordsOnly = keyTermsOnly;
-
-        logger.debug("Analyzer created for " + (keyTermsOnly ? "key terms only." : " custom stemming."));
     }
 
     /**
      * Determine how we should tokenize a field.
+     *
      * @param fieldName The field to tokenize which we do not use.
      * @return The keywords only tokenizer if we are tracking keywords, otherwise extend the standard with keywords.
      */
@@ -58,22 +51,23 @@ public class ComputerScienceAnalyzer extends Analyzer
         // From here, we select if this is only for the keywords or for everything with will use a custom stemmer.
         return new TokenStreamComponents(tokenizer, keywordsOnly
                 // Keywords only.
-                ? new KeyTermsFilter(tokenStream)
+                ? new KeyTermsFilter(tokenStream, Constants.KEY_TERMS)
                 // Use a custom stemmer for the full text, and if that does not match anything, the porter stemmer.
-                : new PorterStemFilter(new ComputerScienceStemFilter(tokenStream, Constants.STEMS_FILE)));
+                : new PorterStemFilter(new CustomStemFilter(tokenStream, Constants.STEMS_FILE)));
     }
 
     /**
      * A function used for debugging that will return the transformed text.
+     *
      * @param fieldName The name of the field to read the text of.
-     * @param text The text itself.
+     * @param text      The text itself.
      * @return The analyzed text.
      * @throws IOException An error reading the file.
      */
     public String analyzeText(String fieldName, String text) throws IOException
     {
         StringBuilder analyzedText = new StringBuilder();
-        
+
         // Tokenize the text with the same analyzer used at index time.
         try (TokenStream tokenStream = this.tokenStream(fieldName, new StringReader(text)))
         {
@@ -88,7 +82,7 @@ public class ComputerScienceAnalyzer extends Analyzer
 
             tokenStream.end();
         }
-        
+
         return analyzedText.toString().trim();
     }
 }
