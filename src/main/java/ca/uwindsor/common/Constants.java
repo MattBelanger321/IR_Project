@@ -46,11 +46,6 @@ public class Constants
         CONTENTS("contents"),
 
         /**
-         * The stemmed contents of the document.
-         */
-        STEMMED_CONTENTS("stemmed_contents"),
-
-        /**
          * The keywords in the document.
          */
         KEYWORDS("keywords");

@@ -1,8 +1,9 @@
 package ca.uwindsor.analyzing;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.Collection;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.TreeSet;
 
 import ca.uwindsor.common.TermsCollection;
@@ -58,6 +59,8 @@ public class ComputerScienceAnalyzer extends Analyzer
      */
     public ComputerScienceAnalyzer(Boolean keyTermsOnly)
     {
+        super();
+
         // Store if we are only interested in key terms.
         this.keyTermsOnly = keyTermsOnly;
 
@@ -94,7 +97,7 @@ public class ComputerScienceAnalyzer extends Analyzer
                     Tokenizer tokenizer = new StandardTokenizer();
 
                     // Perform our base tokenization.
-                    return new TokenStreamComponents(tokenizer, baseTokenStream(tokenizer, stems));
+                    return new TokenStreamComponents(tokenizer, baseTokenStream(tokenizer));
                 }
             })
             {
@@ -103,11 +106,12 @@ public class ComputerScienceAnalyzer extends Analyzer
                 CharTermAttribute attr = stream.addAttribute(CharTermAttribute.class);
                 stream.reset();
 
-                // Stem each part of the term.
+                // Stem each part of the term, joining it back together.
                 while (stream.incrementToken())
                 {
                     sb.append(attr.toString()).append(" ");
                 }
+
                 stream.end();
                 stream.close();
                 keyword = sb.toString().trim();
@@ -117,17 +121,15 @@ public class ComputerScienceAnalyzer extends Analyzer
                 logger.error(e);
             }
 
-            // If there is a map, the keyword is actually just the abbreviation and map this to the term.
-            if (splits.length > 1)
+            keywords.add(keyword);
+            logger.debug("Keyword: " + keyword);
+
+            // If there are maps, ensure they are converted to the keywords.
+            for (int i = 1; i < splits.length; i++)
             {
-                String abbreviation = splits[1].trim();
-                keywords.add(abbreviation);
-                builder.add(new CharsRef(keyword), new CharsRef(abbreviation), true);
-                //logger.debug("Keyword = " + abbreviation + " | Abbreviation = " + keyword + " to " + abbreviation);
-            } else
-            {
-                keywords.add(keyword);
-                //logger.debug("Keyword = " + keyword);
+                String abbreviation = splits[i].trim();
+                builder.add(new CharsRef(abbreviation), new CharsRef(keyword), false);
+                logger.debug("Keyword: " + keyword + " | Abbreviation: " + abbreviation);
             }
         }
 
@@ -145,19 +147,27 @@ public class ComputerScienceAnalyzer extends Analyzer
      * Determine how we should tokenize a field.
      *
      * @param fieldName The field to tokenize which we do not use.
-     * @return The keywords only tokenizer if we are tracking keywords, otherwise extend the standard with keywords.
+     * @return The full tokenization process.
      */
     @Override
     protected TokenStreamComponents createComponents(String fieldName)
     {
+        return fullTokenStream(keyTermsOnly);
+    }
+
+    /**
+     * The full tokenization process.
+     *
+     * @param keyTermsOnly Whether this analyzer should only use key terms or not.
+     * @return The full tokenization process.
+     */
+    private static TokenStreamComponents fullTokenStream(boolean keyTermsOnly)
+    {
         // The base is the standard tokenizer.
         Tokenizer tokenizer = new StandardTokenizer();
 
-        // Perform our base tokenization.
-        TokenStream tokenStream = baseTokenStream(tokenizer, stems);
-
-        // Reduce any keywords to their abbreviations.
-        tokenStream = new SynonymGraphFilter(tokenStream, abbreviations, true);
+        // Perform our base tokenization followed by changing any abbreviations into their keywords.
+        TokenStream tokenStream = new SynonymGraphFilter(baseTokenStream(tokenizer), abbreviations, true);
 
         // If only interested in the keywords, filter it to just them.
         if (keyTermsOnly)
@@ -172,46 +182,96 @@ public class ComputerScienceAnalyzer extends Analyzer
     /**
      * The base part of the tokenization, both during initialization and the indexing and searching.
      *
-     * @param tokenizer  The tokenizer to use.
-     * @param collection The collection of terms.
+     * @param tokenizer The tokenizer to use.
      * @return The core lowercase and stemming portion of the pipeline.
      */
-    private static TokenStream baseTokenStream(Tokenizer tokenizer, Collection<String> collection)
+    private static TokenStream baseTokenStream(Tokenizer tokenizer)
     {
         // Ensure we are in lowercase.
         TokenStream tokenStream = new LowerCaseFilter(tokenizer);
 
         // Perform our custom stemming followed by the porter stemmer on top of it.
-        return new PorterStemFilter(new CustomStemFilter(tokenStream, collection));
+        return new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
+    }
+
+    /**
+     * Analyze a file, writing it to files.
+     *
+     * @param file   The file to analyze.
+     * @param folder The folder to save the result to.
+     * @param output The root name of the output file.
+     * @throws IOException An error reading the file.
+     */
+    public static void analyzeFile(Path file, String folder, String output) throws IOException
+    {
+        // Read the file.
+        InputStream stream = Files.newInputStream(file);
+        InputStreamReader inputStreamReader = new InputStreamReader(stream, StandardCharsets.UTF_8);
+        BufferedReader reader = new BufferedReader(inputStreamReader);
+
+        String line;
+        StringBuilder contents = new StringBuilder();
+        while ((line = reader.readLine()) != null)
+        {
+            contents.append(line).append(System.lineSeparator());
+        }
+
+        String raw = contents.toString();
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(folder + "/" + output + " Raw.txt")))
+        {
+            writer.write(raw);
+        }
+
+        String stemmed = analyzeText(raw, false);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(folder + "/" + output + " Stemmed.txt")))
+        {
+            writer.write(stemmed);
+        }
+
+        String keyTerms = analyzeText(raw, true);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(folder + "/" + output + " Key Terms.txt")))
+        {
+            writer.write(keyTerms);
+        }
     }
 
     /**
      * A function used for debugging that will return the transformed text.
      *
-     * @param fieldName The name of the field to read the text of.
-     * @param text      The text itself.
+     * @param contents     The contents to analyze.
+     * @param keyTermsOnly Whether this analyzer should only use key terms or not.
      * @return The analyzed text.
-     * @throws IOException An error reading the file.
      */
-    public String analyzeText(String fieldName, String text) throws IOException
+    public static String analyzeText(String contents, boolean keyTermsOnly)
     {
-        StringBuilder analyzedText = new StringBuilder();
+        StringBuilder result = new StringBuilder();
 
-        // Tokenize the text with the same analyzer used at index time.
-        try (TokenStream tokenStream = this.tokenStream(fieldName, new StringReader(text)))
+        try (Analyzer analyzer = new Analyzer()
         {
-            CharTermAttribute charTermAttr = tokenStream.addAttribute(CharTermAttribute.class);
+            @Override
+            protected TokenStreamComponents createComponents(String fieldName)
+            {
+                return fullTokenStream(keyTermsOnly);
+            }
+        })
+        {
+            TokenStream tokenStream = analyzer.tokenStream(null, contents);
+            CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
             tokenStream.reset();
 
-            // Collect all tokens (transformed/analyzed version of the text).
+            // Stem each part of the term, joining it back together.
             while (tokenStream.incrementToken())
             {
-                analyzedText.append(charTermAttr.toString()).append(" ");
+                result.append(attr.toString()).append(" ");
             }
 
             tokenStream.end();
+            tokenStream.close();
+        } catch (IOException e)
+        {
+            logger.error(e);
         }
 
-        return analyzedText.toString().trim();
+        return result.toString().trim();
     }
 }

@@ -1,8 +1,6 @@
 package ca.uwindsor.searching;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 
@@ -53,12 +51,9 @@ public class Searcher
         // Get the top five results.
         TopDocs results = CombinedSearch(searcher, request, 5);
 
-        // Helper to check the stemmed files.
-        ComputerScienceAnalyzer stemmedChecker = new ComputerScienceAnalyzer(false);
-
-        // Ensure the folder to save stemmed results exists.
-        String stemsFolder = "Stems";
-        File directory = new File(stemsFolder);
+        // Ensure the folder to save results exists.
+        String resultsFolder = "Results";
+        File directory = new File(resultsFolder);
         if (!directory.exists())
         {
             if (!directory.mkdir())
@@ -102,26 +97,8 @@ public class Searcher
                 }
             }
 
-            // Get the document.
-            String stemmedContents = stemmedChecker.analyzeText(Constants.FieldNames.STEMMED_CONTENTS.getValue(), doc.get(Constants.FieldNames.STEMMED_CONTENTS.getValue()));
-
-            // Write the "stemmed_contents" field to the specified file.
-            if (stemmedContents != null && !stemmedContents.isEmpty())
-            {
-                String output = "Stemmed " + (i + 1) + ".txt";
-
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(stemsFolder + "/" + output)))
-                {
-                    writer.write(stemmedContents);
-                }
-                logger.info("Stemmed contents written to file " + output);
-            } else if (stemmedContents == null)
-            {
-                logger.error("Stemmed contents string is null.");
-            } else
-            {
-                logger.error("Stemmed contents string is empty.");
-            }
+            // Analyze the file.
+            ComputerScienceAnalyzer.analyzeFile(Paths.get(doc.get("path")), resultsFolder, "Result " + (i + 1));
         }
 
         // Cleanup the reader.
@@ -143,8 +120,7 @@ public class Searcher
         // Add all searches, treating them similar to a logical "OR".
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
         builder.add(TitleQuery(request), BooleanClause.Occur.SHOULD);
-        builder.add(ContentsQuery(request, true), BooleanClause.Occur.SHOULD);
-        builder.add(ContentsQuery(request, false), BooleanClause.Occur.SHOULD);
+        builder.add(ContentsQuery(request), BooleanClause.Occur.SHOULD);
         builder.add(KeywordsQuery(request), BooleanClause.Occur.SHOULD);
         return searcher.search(builder.build(), number);
     }
@@ -170,14 +146,13 @@ public class Searcher
      * @param searcher The searcher.
      * @param request  The request we want to search for.
      * @param number   The number of results we want.
-     * @param stemmed  If the stemmed contents should be searched.
      * @return The top results matching the request.
      * @throws IOException    Error reading the indexed documents.
      * @throws ParseException Error parsing the requested search.
      */
-    private static TopDocs ContentsSearch(IndexSearcher searcher, String request, int number, Boolean stemmed) throws IOException, ParseException
+    private static TopDocs ContentsSearch(IndexSearcher searcher, String request, int number) throws IOException, ParseException
     {
-        return searcher.search(ContentsQuery(request, stemmed), number);
+        return searcher.search(ContentsQuery(request), number);
     }
 
     /**
@@ -211,13 +186,12 @@ public class Searcher
      * Create a query for the contents.
      *
      * @param request The request we want to search for.
-     * @param stemmed If the stemmed contents should be searched.
      * @return The query.
      * @throws ParseException Error parsing the requested search.
      */
-    private static Query ContentsQuery(String request, Boolean stemmed) throws ParseException
+    private static Query ContentsQuery(String request) throws ParseException
     {
-        return new QueryParser(stemmed ? Constants.FieldNames.STEMMED_CONTENTS.getValue() : Constants.FieldNames.CONTENTS.getValue(), new ComputerScienceAnalyzer(false)).parse(request);
+        return new QueryParser(Constants.FieldNames.CONTENTS.getValue(), new ComputerScienceAnalyzer(false)).parse(request);
     }
 
     /**
