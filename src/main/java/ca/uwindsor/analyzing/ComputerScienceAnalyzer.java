@@ -96,8 +96,12 @@ public class ComputerScienceAnalyzer extends Analyzer
                     // The base is the standard tokenizer.
                     Tokenizer tokenizer = new StandardTokenizer();
 
-                    // Perform our base tokenization.
-                    return new TokenStreamComponents(tokenizer, baseTokenStream(tokenizer));
+                    // Ensure we are in lowercase.
+                    TokenStream tokenStream = new LowerCaseFilter(tokenizer);
+
+                    // Perform our custom stemming followed by the porter stemmer on top of it.
+                    tokenStream = new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
+                    return new TokenStreamComponents(tokenizer, tokenStream);
                 }
             })
             {
@@ -122,15 +126,29 @@ public class ComputerScienceAnalyzer extends Analyzer
             }
 
             keywords.add(keyword);
-            logger.debug("Keyword: " + keyword);
+
+            StringBuilder sb = new StringBuilder("Keyword: " + keyword);
 
             // If there are maps, ensure they are converted to the keywords.
             for (int i = 1; i < splits.length; i++)
             {
+                // Add both singular and plural abbreviations.
                 String abbreviation = splits[i].trim();
                 builder.add(new CharsRef(abbreviation), new CharsRef(keyword), false);
-                logger.debug("Keyword: " + keyword + " | Abbreviation: " + abbreviation);
+                sb.append(" | ").append(abbreviation);
+
+                // If the root form already ends with an "S" then there is nothing else to do.
+                if (abbreviation.endsWith("s"))
+                {
+                    continue;
+                }
+
+                abbreviation += "s";
+                builder.add(new CharsRef(abbreviation), new CharsRef(keyword), false);
+                sb.append(" | ").append(abbreviation);
             }
+
+            logger.info(sb.toString());
         }
 
         // Set up the abbreviations.
@@ -166,8 +184,14 @@ public class ComputerScienceAnalyzer extends Analyzer
         // The base is the standard tokenizer.
         Tokenizer tokenizer = new StandardTokenizer();
 
+        // Ensure we are in lowercase.
+        TokenStream tokenStream = new LowerCaseFilter(tokenizer);
+
         // Perform our base tokenization followed by changing any abbreviations into their keywords.
-        TokenStream tokenStream = new SynonymGraphFilter(baseTokenStream(tokenizer), abbreviations, true);
+        tokenStream = new SynonymGraphFilter(tokenStream, abbreviations, true);
+
+        // Perform our custom stemming followed by the porter stemmer on top of it.
+        tokenStream = new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
 
         // If only interested in the keywords, filter it to just them.
         if (keyTermsOnly)
@@ -177,21 +201,6 @@ public class ComputerScienceAnalyzer extends Analyzer
 
         // Otherwise, return everything.
         return new TokenStreamComponents(tokenizer, tokenStream);
-    }
-
-    /**
-     * The base part of the tokenization, both during initialization and the indexing and searching.
-     *
-     * @param tokenizer The tokenizer to use.
-     * @return The core lowercase and stemming portion of the pipeline.
-     */
-    private static TokenStream baseTokenStream(Tokenizer tokenizer)
-    {
-        // Ensure we are in lowercase.
-        TokenStream tokenStream = new LowerCaseFilter(tokenizer);
-
-        // Perform our custom stemming followed by the porter stemmer on top of it.
-        return new PorterStemFilter(new CustomStemFilter(tokenStream, stems));
     }
 
     /**
