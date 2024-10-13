@@ -61,12 +61,14 @@ public class Indexer
     public static void main(String[] args) throws IOException
     {
         // Define our custom field to store the frequency of terms.
-        storeAll = new FieldType(TextField.TYPE_STORED);
+        storeAll = new FieldType();
+        storeAll.setStored(true);
+        storeAll.setTokenized(true);
+        storeAll.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
         storeAll.setStoreTermVectors(true);
         storeAll.setStoreTermVectorPositions(true);
         storeAll.setStoreTermVectorOffsets(true);
-        storeAll.setTokenized(true);
-        storeAll.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+        storeAll.freeze();
 
         // Create the override analyzer for the content field to only match computer science terms.
         Map<String, Analyzer> overrides = new HashMap<>();
@@ -146,9 +148,6 @@ public class Indexer
 
             // The keywords are stored noting their frequency.
             doc.add(new Field(Constants.FieldNames.KEYWORDS.getValue(), contents.toString(), storeAll));
-
-            // The contents are tokenized using the custom stemming.
-            doc.add(new Field(Constants.FieldNames.STEMMED_CONTENTS.getValue(), contents.toString(), storeAll));
         }
 
         // Index the document.

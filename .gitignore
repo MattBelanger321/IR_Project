@@ -38,8 +38,8 @@ citeceer2_index
 # Do not save logs.
 logs
 
-# Do not save the stem sample files from the searcher.
-Stems
+# Do not save the sample files from the searcher.
+Results
 
 *.idea
 *.iml
