@@ -4,7 +4,7 @@ This project depends on Maven
 
 ## Api Documentation
 
-![Click Here](docs/webserver_api/webserver_api.md)
+[Click Here](docs/webserver_api/webserver_api.md)
 
 ## Setup
 
