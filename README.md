@@ -2,6 +2,10 @@
 
 This project depends on Maven
 
+## Api Documentation
+
+[Click Here]("./docs/webserver_api/webserver_api.md")
+
 ## Setup
 
 1. This build of Lucene is meant to be run the OpenJDK 20. Use `mvn clean install`
