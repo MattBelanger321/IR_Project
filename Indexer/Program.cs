@@ -5,4 +5,4 @@ using SearchEngine.Lucene;
 await ArXiv.SaveDocumentsGetLinksAsync();
 
 // Index the dataset.
-Core.IndexDirectory();
+Core.Index();

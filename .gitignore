@@ -430,6 +430,6 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Indexes
+# Do not keep the indexed data.
 arXiv/
 arXiv_index/

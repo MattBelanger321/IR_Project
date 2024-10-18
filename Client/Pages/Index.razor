@@ -26,7 +26,7 @@
         {
             <div class="section">
                 <h1><a href="@document.Url" target="_blank">@document.Title</a></h1>
-                <b>@document.FormatAuthors()</b><br/>
+                <b>@MarkupAuthors(document)</b><br/>
                 <p style="text-align: justify">@document.Summary</p>
                 <hr/>
             </div>
@@ -82,8 +82,19 @@
             url += $"?query={_searchModel.Query}";
         }
         
-        // Get the documents.
+        // Clear the existing documents and then get the new documents.
+        _documents = null;
         _documents = await Http.GetFromJsonAsync<SearchDocument[]>(url);
+    }
+
+    /// <summary>
+    /// Create markup authors in case "et al." is passed.
+    /// </summary>
+    /// <param name="document">The document to get the authors for.</param>
+    /// <returns>Markup authors.</returns>
+    private static MarkupString MarkupAuthors(SearchDocument document)
+    {
+        return new(document.FormatAuthors(true));
     }
     
     /// <summary>

@@ -1,4 +1,5 @@
 ﻿using Lucene.Net.Analysis;
+using Lucene.Net.Analysis.TokenAttributes;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using Lucene.Net.QueryParsers.Classic;
@@ -50,11 +51,6 @@ public static class Core
     /// Key for the parsed contents.
     /// </summary>
     private const string ContentsKey = "contents";
-    
-    /// <summary>
-    /// Key for the parsed key terms.
-    /// </summary>
-    private const string KeyTermsKey = "keyterms";
 
     /// <summary>
     /// The name of the custom stems file.
@@ -70,17 +66,6 @@ public static class Core
     /// The default number of documents to query for.
     /// </summary>
     private const int Count = 100;
-    
-    /// <summary>
-    /// The field for key terms to count how often they occur.
-    /// </summary>
-    private static readonly FieldType CountField = new()
-    {
-        IsIndexed = true,
-        IsStored = true,
-        IsTokenized = true,
-        IndexOptions = IndexOptions.DOCS_AND_FREQS
-    };
 
     /// <summary>
     /// Get the path to a file.
@@ -130,16 +115,14 @@ public static class Core
     /// <returns>The analyzer.</returns>
     private static Analyzer LoadAnalyzer()
     {
-        return new StemAndKeyTermsAnalyzer(KeyTermsKey, StemsFile, KeyTermsFile);
+        return new StemAndKeyTermsAnalyzer(StemsFile, KeyTermsFile);
     }
     
-    public static void IndexDirectory()
+    /// <summary>
+    /// Perform indexing.
+    /// </summary>
+    public static void Index()
     {
-        string directoryPath = GetDataset;
-        
-        // Ensure our custom field is ready for use.
-        CountField.Freeze();
-        
         // Open or create the Lucene index directory
         using FSDirectory indexDirectory = FSDirectory.Open(GetIndexDirectory());
 
@@ -163,7 +146,7 @@ public static class Core
         }
 
         // Iterate over all files in our dataset.
-        foreach (string filePath in Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories))
+        foreach (string filePath in Directory.GetFiles(GetDataset, "*.*", SearchOption.AllDirectories))
         {
             // Read the current file.
             string[] file = File.ReadAllText(filePath).Split("\n");
@@ -192,7 +175,6 @@ public static class Core
                 new StringField(SummaryKey, file[2], Field.Store.YES),
                 new StringField(AuthorsKey, authors, Field.Store.YES),
                 new TextField(ContentsKey, contents, Field.Store.YES),
-                new Field(KeyTermsKey, contents, CountField)
             });
         }
 
@@ -216,23 +198,11 @@ public static class Core
         IndexSearcher searcher = new(reader);
         
         // Build the query.
-        Query query;
-        
-        // If the query was empty, match all documents.
-        if (string.IsNullOrWhiteSpace(queryString))
-        {
-            query = new MatchAllDocsQuery();
-        }
-        else
-        {
-            // Otherwise, search the contents and keywords.
-            Analyzer analyzer = LoadAnalyzer();
-            query = new BooleanQuery(false)
-            {
-                { new QueryParser(Version, ContentsKey, analyzer).Parse(queryString), Occur.SHOULD },
-                { new QueryParser(Version, KeyTermsKey, analyzer).Parse(queryString), Occur.SHOULD }
-            };
-        }
+        Query query =
+            // If the query was empty, match all documents.
+            string.IsNullOrWhiteSpace(queryString) ? new MatchAllDocsQuery() :
+            // Otherwise, search the contents.
+            new QueryParser(Version, ContentsKey, LoadAnalyzer()).Parse(queryString);
 
         // Load the information for the documents.
         TopDocs topDocs = searcher.Search(query, count < 1 ? 1 : count);
@@ -261,5 +231,32 @@ public static class Core
         }
 
         return documents;
+    }
+
+    /// <summary>
+    /// Test an analyzer on a sample string.
+    /// </summary>
+    /// <param name="s">The string to test on.</param>
+    /// <param name="analyzer">The analyzer to run, defaulting to the main analyzer.</param>
+    /// <returns>The string as a result of having been parsed by our analyzer.</returns>
+    public static string RunAnalyzer(string s, Analyzer? analyzer = null)
+    {
+        analyzer ??= LoadAnalyzer();
+        
+        // Use our loading analyzer to stem the keyword.
+        using TokenStream stream = analyzer.GetTokenStream(null, s);
+        ICharTermAttribute termAttr = stream.AddAttribute<ICharTermAttribute>();
+        stream.Reset();
+        
+        // Parse the sample s.
+        string parsed = string.Empty;
+        while (stream.IncrementToken())
+        {
+            parsed += $"{termAttr.ToString()} ";
+        }
+            
+        // Cleanup and return the cleaned s.
+        stream.End();
+        return parsed.Trim();
     }
 }

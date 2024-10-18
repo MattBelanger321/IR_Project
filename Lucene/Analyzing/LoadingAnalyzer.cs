@@ -6,24 +6,10 @@ using Lucene.Net.Analysis.Standard;
 namespace SearchEngine.Lucene.Analyzing;
 
 /// <summary>
-/// Helper analyzer for the initial loading process for building keywords and lemmatizing.
+/// Helper analyzer for the initial loading process for building keywords and abbreviations.
 /// </summary>
 public class LoadingAnalyzer : Analyzer
 {
-    /// <summary>
-    /// The stems for custom stemming.
-    /// </summary>
-    private readonly SortedSet<string> _stems;
-    
-    /// <summary>
-    /// Load in the custom stems.
-    /// </summary>
-    /// <param name="stems">The custom stems.</param>
-    public LoadingAnalyzer(SortedSet<string> stems)
-    {
-        _stems = stems;
-    }
-    
     /// <summary>
     /// Build the tokenizing process.
     /// </summary>
@@ -35,7 +21,7 @@ public class LoadingAnalyzer : Analyzer
         // Use the standard analyzer as we do in our main analyzer.
         Tokenizer tokenizer = new StandardTokenizer(Core.Version, reader);
         
-        // Lowercase everything and then pass it to our custom stemming before the porter stemmer.
-        return new(tokenizer, new PorterStemFilter(new CustomStemFilter(new LowerCaseFilter(Core.Version, tokenizer), _stems)));
+        // Lowercase everything, but don't run anything else during this initial mini-loading.
+        return new(tokenizer, new LowerCaseFilter(Core.Version, tokenizer));
     }
 }

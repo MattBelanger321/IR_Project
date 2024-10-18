@@ -29,20 +29,12 @@ public class StemAndKeyTermsAnalyzer : Analyzer
     private static SynonymMap? _abbreviations;
 
     /// <summary>
-    /// The key for when the key terms only portion should be activated.
-    /// </summary>
-    private readonly string _keyTermsKey;
-
-    /// <summary>
     /// Build the custom analyzer.
     /// </summary>
-    /// <param name="keyTermsKey">The field key for when the key terms should be filtered for.</param>
     /// <param name="stemsFile">The file which contains the stems.</param>
     /// <param name="keyTermsFile">The file which contains the key terms.</param>
-    public StemAndKeyTermsAnalyzer(string keyTermsKey, string stemsFile, string keyTermsFile) : base(PER_FIELD_REUSE_STRATEGY)
+    public StemAndKeyTermsAnalyzer(string stemsFile, string keyTermsFile)
     {
-        _keyTermsKey = keyTermsKey;
-        
         // If everything is already loaded, there is nothing to do.
         if (_stems != null && _keyTerms != null && _abbreviations != null)
         {
@@ -60,38 +52,29 @@ public class StemAndKeyTermsAnalyzer : Analyzer
         // Build our real key terms.
         _keyTerms = new();
         SynonymMap.Builder builder = new(true);
-        LoadingAnalyzer analyzer = new(_stems);
+        LoadingAnalyzer analyzer = new();
         
         // If the key term has any abbreviations, they are separated by the "|".
         foreach (string[] splits in initialKeywords.Select(keyword => keyword.Split('|')))
         {
-            // Use our loading analyzer to stem the keyword.
-            using TokenStream stream = analyzer.GetTokenStream(null, splits[0]);
-            ICharTermAttribute termAttr = stream.AddAttribute<ICharTermAttribute>();
-            stream.Reset();
-
-            // Build the stemmed key term.
-            string parsed = string.Empty;
-            while (stream.IncrementToken())
+            // Run every key term and abbreviation through the base analyzing.
+            for (int i = 0; i < splits.Length; i++)
             {
-                parsed += $"{termAttr.ToString()} ";
+                splits[i] = Core.RunAnalyzer(splits[i], analyzer);
             }
             
-            // Cleanup and save the stemmed key term.
-            stream.End();
-            parsed = parsed.Trim();
-            _keyTerms.Add(parsed);
+            // Save the parsed key term.
+            _keyTerms.Add(splits[0]);
 
             // Add maps for all abbreviations.
             for (int i = 1; i < splits.Length; i++)
             {
-                string abbreviation = splits[i].Trim();
-                builder.Add(new(abbreviation), new(parsed), false);
+                builder.Add(new(splits[i]), new(splits[0]), false);
 
                 // Add plural abbreviations as well.
-                if (abbreviation[^1] != 's')
+                if (splits[i][^1] != 's')
                 {
-                    builder.Add(new(abbreviation + 's'), new(parsed), false);
+                    builder.Add(new(splits[i] + 's'), new(splits[0]), false);
                 }
             }
         }
@@ -111,10 +94,19 @@ public class StemAndKeyTermsAnalyzer : Analyzer
         // Use the standard analyzer.
         Tokenizer tokenizer = new StandardTokenizer(Core.Version, reader);
         
-        // Lower case everything, convert the abbreviations, then run our custom and then porter stemming.
-        TokenStream tokenStream = new PorterStemFilter(new CustomStemFilter(new SynonymFilter(new LowerCaseFilter(Core.Version, tokenizer), _abbreviations, true), _stems ?? new()));
+        // Convert everything to lowercase.
+        TokenStream tokenStream = new LowerCaseFilter(Core.Version, tokenizer);
+
+        // Replace all abbreviations with their respective keywords.
+        tokenStream = new SynonymFilter(tokenStream, _abbreviations, true);
+
+        // Filter out stop words.
+        tokenStream = new StopFilter(Core.Version, tokenStream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);
         
-        // If we are only interested in key terms, run it through the key terms filter as well.
-        return new(tokenizer, fieldName == _keyTermsKey ? new KeyTermsFilter(tokenStream, _keyTerms ?? new()) : tokenStream);
+        // Run our custom and then porter stemming.
+        tokenStream = new PorterStemFilter(new CustomStemFilter(tokenStream, _stems ?? new()));
+
+        // Return our pipeline.
+        return new(tokenizer, tokenStream);
     }
 }

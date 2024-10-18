@@ -39,8 +39,9 @@ public class SearchDocument
     /// </summary>
     /// <param name="url">If the URL should be in the string.</param>
     /// <param name="authors">If the authors should be in the string.</param>
+    /// <param name="html">If this is for HTML and thus an "et al." should be italicized.</param>
     /// <returns>The formatted string.</returns>
-    public string Format(bool url = false, bool authors = false)
+    public string Format(bool url = false, bool authors = false, bool html = false)
     {
         // Add the URL if we should.
         string result = url && Url != null ? $"URL: {Url}" : string.Empty;
@@ -64,7 +65,7 @@ public class SearchDocument
                 result += "\n";
             }
 
-            result += $"Authors: {FormatAuthors()}";
+            result += $"Authors: {FormatAuthors(html)}";
         }
 
         // Add the summary if it exists.
@@ -84,8 +85,9 @@ public class SearchDocument
     /// <summary>
     /// Format the authors properly.
     /// </summary>
-    /// <returns></returns>
-    public string FormatAuthors()
+    /// <param name="html">If this is for HTML and thus an "et al." should be italicized.</param>
+    /// <returns>The authors formatted properly.</returns>
+    public string FormatAuthors(bool html = false)
     {
         // If there are no authors, there is nothing to return.
         if (Authors == null || Authors.Length == 0)
@@ -104,6 +106,12 @@ public class SearchDocument
             // For three or more authors, combine them with commas with an and for the last one.
             default:
             {
+                // In IEEE, we can use "et al." if there are more than six authors.
+                if (Authors.Length > 6)
+                {
+                    return html ? $"{Authors[0]} <i>et al.</i>" : $"{Authors[0]} et al.";
+                }
+                
                 string allButLast = string.Join(", ", Authors.Take(Authors.Length - 1));
                 return $"{allButLast}, and {Authors[^1]}";
             }
