@@ -16,9 +16,14 @@ public class SearchDocument
     public string? Summary { get; set; }
     
     /// <summary>
-    /// The ID of the document.
+    /// The arXiv ID of the document.
     /// </summary>
-    public string? Id { get; set; }
+    public string? ArXivId { get; set; }
+    
+    /// <summary>
+    /// The Lucene index ID.
+    /// </summary>
+    public int? IndexId { get; set; }
     
     /// <summary>
     /// The authors of the document.
@@ -44,7 +49,24 @@ public class SearchDocument
     public string Format(bool id = false, bool authors = false, bool html = false)
     {
         // Add the ID if we should.
-        string result = id && Id != null ? $"ID: {Id}" : string.Empty;
+        string result;
+        if (id)
+        {
+            result = id && ArXivId != null ? $"ArXiV ID: {ArXivId}" : string.Empty;
+            if (IndexId != null)
+            {
+                if (result != string.Empty)
+                {
+                    result += "\n";
+                }
+                
+                result += $"Index ID: {IndexId}";
+            }
+        }
+        else
+        {
+            result = string.Empty;
+        }
 
         // Add the title if it exists.
         if (Title != null)

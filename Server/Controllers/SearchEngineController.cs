@@ -28,11 +28,12 @@ public class SearchEngineController : ControllerBase
     /// <summary>
     /// Our primary (and currently only) API get method.
     /// </summary>
-    /// <param name="query">The query from the user.</param>
+    /// <param name="query">The search query from the user.</param>
+    /// <param name="id">The ID for searching for a similar document.</param>
     /// <returns>The best results for the query.</returns>
     [HttpGet]
-    public IEnumerable<SearchDocument> Get([FromQuery] string? query = null)
+    public IEnumerable<SearchDocument> Get([FromQuery] string? query = null, [FromQuery] int? id = null)
     {
-        return Core.Search(query ?? string.Empty);
+        return Core.Search(query, id);
     }
 }
