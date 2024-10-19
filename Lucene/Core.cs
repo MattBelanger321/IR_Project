@@ -30,9 +30,9 @@ public static class Core
     private const string Dataset = "arXiv";
     
     /// <summary>
-    /// Key for the URLs.
+    /// Key for the IDs.
     /// </summary>
-    private const string UrlKey = "url";
+    private const string IdKey = "id";
     
     /// <summary>
     /// Key for the titles.
@@ -267,31 +267,34 @@ public static class Core
         for (int i = 0; i < files.Length; i++)
         {
             Console.WriteLine($"Indexing file {i + 1} of {files.Length}");
+
+            // The ID is the file name.
+            string id = Path.GetFileNameWithoutExtension(files[i]);
+
+            // If this file already exists, skip indexing it.
+            if (searcher != null && searcher.Search(new TermQuery(new(IdKey, id)), 1).TotalHits > 0)
+            {
+                continue;
+            }
             
             // Read the current file.
             string[] file = File.ReadAllText(files[i]).Split("\n");
 
-            // If this file already exists, skip indexing it.
-            if (searcher != null && searcher.Search(new TermQuery(new(TitleKey, file[1])), 1).TotalHits > 0)
-            {
-                continue;
-            }
-
             // Index the authors formatted nicely.
-            string authors = file.Length > 3 ? file[3] : string.Empty;
-            for (int j = 4; j < file.Length; j++)
+            string authors = file.Length > 2 ? file[2] : string.Empty;
+            for (int j = 3; j < file.Length; j++)
             {
                 authors += $"|{file[j]}";
             }
 
             // Build and add the document.
-            writer.AddDocument(new Document()
+            writer.AddDocument(new Document
             {
-                new StringField(UrlKey, file[0], Field.Store.YES),
-                new StringField(TitleKey, file[1], Field.Store.YES),
-                new StringField(SummaryKey, file[2], Field.Store.YES),
+                new StringField(IdKey, id, Field.Store.YES),
+                new StringField(TitleKey, file[0], Field.Store.YES),
+                new StringField(SummaryKey, file[1], Field.Store.YES),
                 new StringField(AuthorsKey, authors, Field.Store.YES),
-                new TextField(ContentsKey, Preprocess($"{file[1]} {file[2]}"), Field.Store.YES),
+                new TextField(ContentsKey, Preprocess($"{file[0]} {file[1]}"), Field.Store.YES)
             });
         }
 
@@ -343,7 +346,7 @@ public static class Core
             // Add the document.
             documents[i] = new()
             {
-                Url = doc.Get(UrlKey) ?? string.Empty,
+                Id = doc.Get(IdKey) ?? string.Empty,
                 Title = doc.Get(TitleKey) ?? string.Empty,
                 Summary = doc.Get(SummaryKey) ?? string.Empty,
                 Authors = authors.ToArray()
