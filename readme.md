@@ -53,5 +53,6 @@
   - HTML (Note that not all documents may have this) - https://arxiv.org/html/ID
 - The first line of a text file contains the title of the document.
 - The second line contains the abstract.
-- The third and beyond lines each contain an author name, depending on how many authors there are for a given paper.
+- The third line has the date and time in the format of "YYYY-DD-MM hh:mm:ss".
+- The fourth line and beyond lines each contain an author name, depending on how many authors there are for a given paper.
 - All text has been preprocessed, ensuring all whitespace has been replaced by single spaces.

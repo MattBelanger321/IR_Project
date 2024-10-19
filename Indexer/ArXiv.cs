@@ -29,12 +29,12 @@ public static partial class ArXiv
     /// <summary>
     /// The default maximum number of results to get from arXiv at once.
     /// </summary>
-    private const int MaxResults = 1000;
+    private const int MaxResults = 10;
 
     /// <summary>
     /// The default total number of results we want for our own database.
     /// </summary>
-    private const int TotalResults = 1000;
+    private const int TotalResults = 10;
 
     /// <summary>
     /// All arXiv computer science categories.
@@ -80,6 +80,13 @@ public static partial class ArXiv
     /// <returns>The string with the version removed.</returns>
     [GeneratedRegex(@"v\d+$")]
     private static partial Regex VersionRemover();
+
+    /// <summary>
+    /// Regex to keep only numbers, replacing everything else with a space.
+    /// </summary>
+    /// <returns></returns>
+    [GeneratedRegex(@"\D+")]
+    private static partial Regex OnlyNumbers();
     
     /// <summary>
     /// Pipeline to try and automatically get rid of markdown or LaTeX.
@@ -154,17 +161,14 @@ public static partial class ArXiv
                 foreach (SearchDocument document in documents)
                 {
                     // If the file already exists in any category, there is no need to write it again.
-                    if (document.ArXivId == null || allFiles.Contains(document.ArXivId))
+                    if (document.ArXivId == null || document.Title == null || document.Summary == null || document.Authors == null || document.Updated == null || allFiles.Contains(document.ArXivId))
                     {
                         continue;
                     }
 
                     // Build the new file.
-                    string contents = $"{document.Title}\n{document.Summary}";
-                    if (document.Authors != null)
-                    {
-                        contents = document.Authors.Aggregate(contents, (current, author) => current + $"\n{author}");
-                    }
+                    string contents = $"{document.Title}\n{document.Summary}\n{document.Updated.Value.Year}-{document.Updated.Value.Month}-{document.Updated.Value.Day} {document.Updated.Value.Hour}:{document.Updated.Value.Minute}:{document.Updated.Value.Second}";
+                    contents = document.Authors.Aggregate(contents, (current, author) => current + $"\n{author}");
 
                     // Write to the new file.
                     await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{document.ArXivId}.txt"), contents);
@@ -259,6 +263,12 @@ public static partial class ArXiv
             {
                 continue;
             }
+
+            DateTime? updated = GetUpdated(entry);
+            if (updated == null)
+            {
+                continue;
+            }
             
             // Add the document.
             documents.Add(new()
@@ -266,7 +276,8 @@ public static partial class ArXiv
                 ArXivId = id,
                 Title = title,
                 Summary = summary,
-                Authors = GetAuthors(entry)
+                Authors = GetAuthors(entry),
+                Updated = updated
             });
         }
         
@@ -284,6 +295,49 @@ public static partial class ArXiv
             .Elements($"{XmlCore}author")
             .Select(author => CleanString(author.Element($"{XmlCore}name")?.Value ?? string.Empty))
             .ToArray();
+    }
+
+    /// <summary>
+    /// Get the time the article was last updated.
+    /// </summary>
+    /// <param name="entry">The XML entry.</param>
+    /// <returns>The parsed time.</returns>
+    private static DateTime? GetUpdated(XElement entry)
+    {
+        // Get the time it was last updated.
+        XElement? element = entry.Element($"{XmlCore}updated");
+        
+        // If this is missing, look for the published time.
+        if (element == null)
+        {
+            element = entry.Element($"{XmlCore}published");
+            
+            // If there is no published time, there is no date and time.
+            if (element == null)
+            {
+                return null;
+            }
+        }
+
+        // Extract all numbers from the string.
+        string[] raw = OnlyNumbers().Replace(element.Value, " ").Split(' ');
+        
+        // Cast to numbers, padding with zeros if any happened to be missing.
+        int[] values = new int[6];
+        for (int i = 0; i < values.Length; i++)
+        {
+            try
+            {
+                values[i] = int.Parse(raw[i]);
+            }
+            catch
+            {
+                values[i] = 0;
+            }
+        }
+
+        // Return the new date and time.
+        return new DateTime(values[0], values[1], values[2], values[3], values[4], values[5]);
     }
 
     /// <summary>

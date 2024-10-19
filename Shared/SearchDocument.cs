@@ -29,6 +29,11 @@ public class SearchDocument
     /// The authors of the document.
     /// </summary>
     public string[]? Authors { get; set; }
+    
+    /// <summary>
+    /// The date and time this document was updated.
+    /// </summary>
+    public DateTime? Updated { get; set; }
 
     /// <summary>
     /// Write this to a standardized format.
@@ -44,9 +49,9 @@ public class SearchDocument
     /// </summary>
     /// <param name="id">If the ID should be in the string.</param>
     /// <param name="authors">If the authors should be in the string.</param>
-    /// <param name="html">If this is for HTML and thus an "et al." should be italicized.</param>
+    /// <param name="updated">If when the document was updated should be in the string.</param>
     /// <returns>The formatted string.</returns>
-    public string Format(bool id = false, bool authors = false, bool html = false)
+    public string Format(bool id = false, bool authors = false, bool updated = false)
     {
         // Add the ID if we should.
         string result;
@@ -87,7 +92,18 @@ public class SearchDocument
                 result += "\n";
             }
 
-            result += $"Authors: {FormatAuthors(html)}";
+            result += $"Authors: {FormatAuthors()}";
+        }
+
+        // Add the time it was updated if we should.
+        if (updated && Updated != null)
+        {
+            if (result != string.Empty)
+            {
+                result += "\n";
+            }
+            
+            result += $"Updated: {FormatUpdated()}";
         }
 
         // Add the summary if it exists.
@@ -138,5 +154,14 @@ public class SearchDocument
                 return $"{allButLast}, and {Authors[^1]}";
             }
         }
+    }
+
+    /// <summary>
+    /// Get the date and time formatted.
+    /// </summary>
+    /// <returns>The date and time formatted.</returns>
+    public string FormatUpdated()
+    {
+        return Updated.HasValue ? Updated.Value.ToString("MMMM d, yyyy 'at' h:mm:ss tt") : string.Empty;
     }
 }
