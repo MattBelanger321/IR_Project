@@ -1,7 +1,7 @@
 namespace SearchEngine.Shared;
 
 /// <summary>
-/// Helper for the document information to be passed between sub-projects.
+/// Helper for the document information to be passed between subprojects.
 /// </summary>
 public class SearchDocument
 {
@@ -16,9 +16,9 @@ public class SearchDocument
     public string? Summary { get; set; }
     
     /// <summary>
-    /// The URL of the document.
+    /// The ID of the document.
     /// </summary>
-    public string? Url { get; set; }
+    public string? Id { get; set; }
     
     /// <summary>
     /// The authors of the document.
@@ -37,14 +37,14 @@ public class SearchDocument
     /// <summary>
     /// Write to a standardized format, optionally ignoring some parts for clarity.
     /// </summary>
-    /// <param name="url">If the URL should be in the string.</param>
+    /// <param name="id">If the ID should be in the string.</param>
     /// <param name="authors">If the authors should be in the string.</param>
     /// <param name="html">If this is for HTML and thus an "et al." should be italicized.</param>
     /// <returns>The formatted string.</returns>
-    public string Format(bool url = false, bool authors = false, bool html = false)
+    public string Format(bool id = false, bool authors = false, bool html = false)
     {
         // Add the URL if we should.
-        string result = url && Url != null ? $"URL: {Url}" : string.Empty;
+        string result = id && Id != null ? $"URL: {Id}" : string.Empty;
 
         // Add the title if it exists.
         if (Title != null)

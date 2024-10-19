@@ -54,13 +54,6 @@ public static partial class ArXiv
     private static partial Regex CleanWhitespaceRegex();
 
     /// <summary>
-    /// Regex method to remove illegal characters for file names.
-    /// </summary>
-    /// <returns>The regex method to remove all illegal characters for file names.</returns>
-    [GeneratedRegex(@"[\\/:*?""<>|]")]
-    private static partial Regex CleanFileName();
-
-    /// <summary>
     /// Remove markdown or LaTeX math.
     /// </summary>
     /// <returns>The cleaned string.</returns>
@@ -80,6 +73,18 @@ public static partial class ArXiv
     /// <returns>The cleaned string.</returns>
     [GeneratedRegex("[{}]")]
     private static partial Regex RemoveExtraBraces();
+
+    /// <summary>
+    /// Regex to remove the arXiv version.
+    /// </summary>
+    /// <returns>The string with the version removed.</returns>
+    [GeneratedRegex(@"v\d+$")]
+    private static partial Regex VersionRemover();
+    
+    /// <summary>
+    /// Pipeline to try and automatically get rid of markdown or LaTeX.
+    /// </summary>
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
     /// <summary>
     /// Save raw documents from arXiv.
@@ -114,14 +119,14 @@ public static partial class ArXiv
         HashSet<string> allFiles = [];
         foreach (string s in Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories))
         {
-            allFiles.Add(Path.GetFileName(s));
+            allFiles.Add(Path.GetFileNameWithoutExtension(s));
         }
 
         // Get papers for all categories.
-        foreach (string category in Categories)
+        for (int i = 0; i < Categories.Length; i++)
         {
             // Ensure the folder for this category exists.
-            string categoryPath = Path.Combine(directoryPath, category);
+            string categoryPath = Path.Combine(directoryPath, Categories[i]);
             if (!Directory.Exists(categoryPath))
             {
                 Directory.CreateDirectory(categoryPath);
@@ -129,18 +134,19 @@ public static partial class ArXiv
             
             // Get how many files are saved under this category.
             int categoryTotalResults = totalResults - Directory.GetFiles(categoryPath, "*.*", SearchOption.AllDirectories).Length;
+            Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | {categoryTotalResults} Remaining");
             
             // Query until we have enough documents for this category.
             int startIndex = 0;
             while (categoryTotalResults > 0)
             {
                 // Search for more documents.
-                int queried = Math.Min(maxResults, categoryTotalResults);
-                List<SearchDocument> documents = await GetLinksAsync(category, sortBy, sortOrder, queried, startIndex);
+                List<SearchDocument>? documents = await GetLinksAsync(Categories[i], sortBy, sortOrder, maxResults, startIndex, allFiles);
 
-                if (documents.Count < 1)
+                // If null was returned, it means no documents were returned by the search.
+                if (documents == null)
                 {
-                    Console.WriteLine($"{category} - No results; either no more or rate limited.");
+                    Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | No results; either no more or rate limited.");
                     break;
                 }
                 
@@ -148,34 +154,32 @@ public static partial class ArXiv
                 foreach (SearchDocument document in documents)
                 {
                     // If the file already exists in any category, there is no need to write it again.
-                    string cleanedName = $"{CleanFileName().Replace(document.Title ?? string.Empty, string.Empty)}.txt";
-                    if (allFiles.Contains(cleanedName))
+                    if (document.Id == null || allFiles.Contains(document.Id))
                     {
                         continue;
                     }
 
                     // Build the new file.
-                    string contents = $"{document.Url}\n{document.Title}\n{document.Summary}";
+                    string contents = $"{document.Title}\n{document.Summary}";
                     if (document.Authors != null)
                     {
                         contents = document.Authors.Aggregate(contents, (current, author) => current + $"\n{author}");
                     }
 
                     // Write to the new file.
-                    await File.WriteAllTextAsync(Path.Combine(categoryPath, cleanedName), contents);
-                    allFiles.Add(cleanedName);
+                    await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{document.Id}.txt"), contents);
+                    allFiles.Add(document.Id);
 
                     // If we have enough documents, stop.
-                    if (--categoryTotalResults <= 0)
+                    Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | {--categoryTotalResults} Remaining");
+                    if (categoryTotalResults <= 0)
                     {
                         break;
                     }
-                    
-                    Console.WriteLine($"{category} - {categoryTotalResults} Remaining");
                 }
 
                 // For the next query, index the next possible documents.
-                startIndex += queried;
+                startIndex += maxResults;
             }
         }
     }
@@ -188,7 +192,8 @@ public static partial class ArXiv
     /// <param name="sortOrder">The sorting order - descending ascending.</param>
     /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="startIndex">The index to start requests from at arXiv.</param>
-    public static async Task<List<SearchDocument>> GetLinksAsync(string category, string sortBy = SortBy, string sortOrder = SortOrder, int maxResults = MaxResults, int startIndex = 0)
+    /// <param name="existing">Any existing results.</param>
+    public static async Task<List<SearchDocument>?> GetLinksAsync(string category, string sortBy = SortBy, string sortOrder = SortOrder, int maxResults = MaxResults, int startIndex = 0, ICollection<string>? existing = null)
     {
         // Ensure valid values.
         if (maxResults < 1)
@@ -201,6 +206,8 @@ public static partial class ArXiv
             startIndex = 0;
         }
 
+        existing ??= new SortedSet<string>();
+
         // Make the HTTP GET request.
         HttpResponseMessage response = await new HttpClient().GetAsync($"http://export.arxiv.org/api/query?search_query=cat:{category}&start={startIndex}&max_results={maxResults}&sortBy={sortBy}&sortOrder={sortOrder}");
 
@@ -210,13 +217,30 @@ public static partial class ArXiv
             throw new HttpRequestException($"Failed: {response.StatusCode}");
         }
 
+        // See how many items were returned.
+        XElement[] returned = XDocument.Parse(await response.Content.ReadAsStringAsync()).Descendants($"{XmlCore}entry").ToArray();
+        
+        // If none were, we have either reached the end or have been rate limited.
+        if (returned.Length < 1)
+        {
+            return null;
+        }
+
         // Save our documents.
         List<SearchDocument> documents = [];
-        foreach (XElement entry in XDocument.Parse(await response.Content.ReadAsStringAsync()).Descendants($"{XmlCore}entry"))
+        foreach (XElement entry in returned)
         {
             // If any value is empty, skip this document.
-            string? url = CleanElement(entry, "id");
-            if (string.IsNullOrWhiteSpace(url))
+            string? id = CleanElement(entry, "id");
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                continue;
+            }
+            
+            // If we already have this file, skip adding it again.
+            // We don't need to keep the version number.
+            id = VersionRemover().Replace(id.Split('/')[^1], string.Empty);
+            if (existing.Contains(id))
             {
                 continue;
             }
@@ -239,7 +263,7 @@ public static partial class ArXiv
             // Add the document.
             documents.Add(new()
             {
-                Url = url,
+                Id = id,
                 Title = title,
                 Summary = summary,
                 Authors = GetAuthors(entry)
@@ -291,9 +315,7 @@ public static partial class ArXiv
     /// <returns>The converted string.</returns>
     private static string ConvertToPlainText(string s)
     {
-        // Try to automatically convert most.
-        MarkdownPipeline pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-        s = Markdown.ToPlainText(s, pipeline);
+        s = Markdown.ToPlainText(s, Pipeline);
         // Try to remove any other math expressions.
         s = RemoveMath().Replace(s, "$1");
         // Try to remove commands.
