@@ -1,193 +1,119 @@
 ﻿artificial intelligence|ai
 machine learning|ml
-cybersecurity
-blockchain
-big data
+large language model|llm
+k-nearest neighbor|knn|k-nn
 natural language processing|nlp
-deep learning|dl
-neural networks
-supervised learning
-unsupervised learning
-reinforcement learning|rl
+computer vision|cv
+support vector machine|svm
 convolutional neural network|cnn
 recurrent neural network|rnn
+generative adversarial network|gan
 long short-term memory|lstm
-generative adversarial networks|gans
-support vector machine|svm
-random forest
-decision trees
-data mining
-data science
-data visualization
-cloud computing
-distributed systems
-internet of things|iot
-edge computing
-fog computing
-quantum computing
-parallel computing
-high-performance computing|hpc
-database management system|dbms
-relational database management system|rdbms
-non-relational database
-sql
-nosql
-hypertext transfer protocol|http
+graphical user interface|gui
+central processing unit|cpu
+graphics processing unit|gpu
+random access memory|ram
+read-only memory|rom
+internet protocol|ip
+transmission control protocol|tcp
+user datagram protocol|udp
 hypertext markup language|html
 cascading style sheets|css
-javascript|js
-application programming interface|api
+javascript object notation|json
 representational state transfer|rest
-simple object access protocol|soap
-event-driven programming
-functional programming
+application programming interface|api
+structured query language|sql
+relational database management system|rdbms
 object-oriented programming|oop
-scripting languages
-compiled languages
-interpreted languages
+integrated development environment|ide
 version control system|vcs
-git
-github
-bitbucket
-software development lifecycle|sdlc
-agile methodology
-scrum
-kanban
-continuous integration|ci
-continuous delivery|cd
-continuous deployment|cd
-unit testing
-integration testing
-regression testing
-acceptance testing
-debugging
-profiling
-code optimization
-compiler
-interpreter
-linker
-loader
-virtual memory
-paging
-segmentation
-operating system|os
-kernel
-process management
-threading
-multithreading
-concurrency
-parallelism
-context switching
-mutex
-semaphore
-deadlock
-race condition
-scheduling algorithms
-round-robin scheduling
-priority scheduling
-first-come first-served scheduling|fcfs
-shortest job next scheduling|sjn
-process synchronization
-inter-process communication|ipc
-remote procedure call|rpc
-middleware
-virtualization
-hypervisor
-containerization
-docker
-kubernetes|k8s
-microservices
-service-oriented architecture|soa
-enterprise architecture
-firewalls
-intrusion detection system|ids
-intrusion prevention system|ips
+uniform resource locator|url
+hypertext transfer protocol|http
+simple mail transfer protocol|smtp
+domain name system|dns
+simple object access protocol|soap
+extensible markup language|xml
+websocket protocol|ws
+virtual private network|vpn
+cloud computing|cc
+docker container|dc
+virtual machine|vm
+solid state drive|ssd
+hard disk drive|hdd
+field-programmable gate array|fpga
+machine-to-machine|m2m
+deep learning|dl
+edge computing|ec
+internet of things|iot
+distributed denial of service|ddos
+content delivery network|cdn
 public key infrastructure|pki
-encryption
-asymmetric encryption
-symmetric encryption
-hashing
-digital signature
+advanced encryption standard|aes
+virtual reality|vr
+augmented reality|ar
+mixed reality|mr
+lightweight directory access protocol|ldap
+high-performance computing|hpc
+data loss prevention|dlp
+multi-factor authentication|mfa
+role-based access control|rbac
+data warehouse|dw
+extract, transform, load|etl
+big data|bd
+business intelligence|bi
+data science|ds
+data engineering|de
+neural network|nn
+transformer neural network|tnn
+secure shell|ssh
+public key cryptography|pkc
+asymmetric encryption|ae
+symmetric encryption|se
+computational fluid dynamics|cfd
+finite element analysis|fea
+lossless compression|lc
+lossy compression|lc
+network address translation|nat
+artificial neural network|ann
+generative pre-trained transformer|gpt
+transfer learning|tl
+bayesian network|bn
+principal component analysis|pca
+turing machine|tm
+hash-based message authentication code|hmac
 secure sockets layer|ssl
 transport layer security|tls
+data visualization|dv
+quantum computing|qc
+differential privacy|dp
+data mining|dm
+software development kit|sdk
+application lifecycle management|alm
+test-driven development|tdd
+continuous integration|ci
+continuous deployment|cd
+pair programming|pp
+automated teller machine|atm
+natural user interface|nui
+proportional-integral-derivative|pid
 data encryption standard|des
-advanced encryption standard|aes
-pretty good privacy|pgp
-data integrity
-confidentiality
-availability
-authentication
-authorization
-multi-factor authentication|mfa
-single sign-on|sso
-token-based authentication
-block cipher
-stream cipher
-public key cryptography
-private key
-session key
-message authentication code|mac
-network security
-network protocols
-transmission control protocol|tcp
-internet protocol|ip
-user datagram protocol|udp
-domain name system|dns
-file transfer protocol|ftp
-simple mail transfer protocol|smtp
-secure shell|ssh
-internet control message protocol|icmp
-dynamic host configuration protocol|dhcp
-load balancing
-network address translation|nat
-virtual private network|vpn
-cloud storage
-software as a service|saas
-platform as a service|paas
-infrastructure as a service|iaas
-distributed ledger technology|dlt
-consensus algorithms
-proof of work|pow
-proof of stake|pos
-smart contracts
-ethereum
-bitcoin
-cryptocurrency
-tokenization
+near-field communication|nfc
+object-relational mapping|orm
+message queue telemetry transport|mqtt
+remote procedure call|rpc
+internet service provider|isp
+multi-threading|mt
+finite state machine|fsm
+approximate nearest neighbor|ann
+genetic algorithm|ga
+information retrieval|ir
+multi-layer perceptron|mlp
+short message service|sms
+peer-to-peer|p2p
+point-to-point|ptp
 zero-knowledge proof|zkp
 secure multi-party computation|smc
-artificial neural network|ann
-finite state machine|fsm
-regular expressions|regex
-context-free grammar|cfg
-turing machine
-lambda calculus
-computational complexity
-big-o notation
-time complexity
-space complexity
-p vs np problem
-np-complete
-np-hard
-approximation algorithms
-greedy algorithms
-dynamic programming
-divide and conquer
-backtracking
-graph theory
-shortest path algorithms
-dijkstra’s algorithm
-breadth-first search|bfs
-depth-first search|dfs
-binary search tree|bst
-red-black tree
-b-tree
-hash tables
-heaps
-priority queues
-queues
-stacks
-linked lists
-arrays
-recursion
-iteration
+data lake|dl
+machine-readable code|mrc
+cross-site scripting|xss
+sql injection|sqli
