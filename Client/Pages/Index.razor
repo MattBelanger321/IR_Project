@@ -1,0 +1,110 @@
+﻿@page "/"
+@using SearchEngine.Shared
+@inject HttpClient Http
+@inject IJSRuntime Js
+
+<PageTitle>Search Engine</PageTitle>
+
+<div class="search-bar">
+    <EditForm Model="@_searchModel" OnSubmit="@Search" style="display: flex; max-width: 650px; margin: 0 auto;">
+        <InputText @bind-Value="_searchModel.Query" style="flex-grow: 1; padding: 8px; font-size: 16px; box-sizing: border-box;"/>
+        <button type="submit" style="padding: 8px 16px; font-size: 16px; white-space: nowrap;">Submit</button>
+    </EditForm>
+</div>
+<div class="main">
+    @if (_documents == null)
+    {
+        <p style="text-align: center;"><em>Loading...</em></p>
+    }
+    else if (_documents.Length == 0)
+    {
+        <p style="text-align: center;">No documents.</p>
+    }
+    else
+    {
+        @foreach (SearchDocument? document in _documents)
+        {
+            <div class="section">
+                <h1><a href="@document.Url" target="_blank">@document.Title</a></h1>
+                <b>@MarkupAuthors(document)</b><br/>
+                <p style="text-align: justify">@document.Summary</p>
+                <hr/>
+            </div>
+        }
+    }
+</div>
+
+@code
+{
+    /// <summary>
+    /// The documents that have been loaded.
+    /// </summary>
+    private SearchDocument[]? _documents;
+
+    /// <summary>
+    /// The input for searching.
+    /// </summary>
+    private readonly SearchModel _searchModel = new();
+
+    /// <summary>
+    /// Called when the page loads.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        // Run an empty search, just getting the top relevant documents.
+        await Search();
+    }
+
+    /// <summary>
+    /// Called when the page has updated rendering.
+    /// </summary>
+    /// <param name="firstRender">If this is the first render or not.</param>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            await Js.InvokeVoidAsync("fade");
+        }
+        
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    /// <summary>
+    /// Search for documents.
+    /// </summary>
+    private async Task Search()
+    {
+        string url = "SearchEngine";
+        
+        // If the query is not empty, set it for our API.
+        if (!string.IsNullOrWhiteSpace(_searchModel.Query))
+        {
+            url += $"?query={_searchModel.Query}";
+        }
+        
+        // Clear the existing documents and then get the new documents.
+        _documents = null;
+        _documents = await Http.GetFromJsonAsync<SearchDocument[]>(url);
+    }
+
+    /// <summary>
+    /// Create markup authors in case "et al." is passed.
+    /// </summary>
+    /// <param name="document">The document to get the authors for.</param>
+    /// <returns>Markup authors.</returns>
+    private static MarkupString MarkupAuthors(SearchDocument document)
+    {
+        return new(document.FormatAuthors(true));
+    }
+    
+    /// <summary>
+    /// Helper for building the form to submit the search.
+    /// </summary>
+    public class SearchModel
+    {
+        /// <summary>
+        /// The query from the user.
+        /// </summary>
+        public string Query { get; set; } = string.Empty;
+    }
+}
