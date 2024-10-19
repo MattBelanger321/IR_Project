@@ -26,10 +26,11 @@
         {
             <div class="section">
                 <h1><a href="https://arxiv.org/abs/@document.ArXivId" target="_blank">@document.Title</a></h1>
-                <b>@MarkupAuthors(document)</b><br/>
+                <b>@MarkupAuthors(document)</b>
+                <p>@document.FormatUpdated()</p>
                 @if (document.IndexId.HasValue)
                 {
-                    <button style="margin: 15px;" @onclick="() => Search(document)">Related Papers</button>
+                    <button style="margin-bottom: 15px;" @onclick="() => Search(document)">Related Papers</button>
                 }
                 <p style="text-align: justify">@document.Summary</p>
                 <hr/>
@@ -96,7 +97,7 @@
             return;
         }
 
-        // Otherwise, show similar documents, ensuring the document we searched for is at the top of the.
+        // Otherwise, show similar documents, ensuring the document we searched for is at the top of the page.
         List<SearchDocument> composed = new() {document};
         composed.AddRange(documents.Where(x => x.IndexId != document.IndexId));
         _documents = composed.ToArray();
@@ -108,16 +109,33 @@
     private async Task Search()
     {
         string url = "SearchEngine";
-        
+
+        bool hasQuery = !string.IsNullOrWhiteSpace(_searchModel.Query);
         // If the query is not empty, set it for our API.
-        if (!string.IsNullOrWhiteSpace(_searchModel.Query))
+        if (hasQuery)
         {
             url += $"?query={_searchModel.Query}";
         }
         
         // Clear the existing documents and then get the new documents.
         _documents = null;
-        _documents = await Http.GetFromJsonAsync<SearchDocument[]>(url);
+        SearchDocument[]? documents = await Http.GetFromJsonAsync<SearchDocument[]>(url);
+        
+        // If there are no documents, then there is nothing to do.
+        if (documents == null)
+        {
+            return;
+        }
+
+        // If there was a query, display the documents as they have been found.
+        if (hasQuery)
+        {
+            _documents = documents;
+            return;
+        }
+
+        // If there was no query, order documents from newest to oldest, breaking ties with the title.
+        _documents = documents.OrderByDescending(x => x.Updated).ThenBy(x => x.Title).ToArray();
     }
 
     /// <summary>

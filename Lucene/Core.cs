@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
 using Lucene.Net.Analysis;
 using Lucene.Net.Analysis.TokenAttributes;
 using Lucene.Net.Documents;
@@ -49,6 +50,11 @@ public static class Core
     /// Key for the summaries.
     /// </summary>
     private const string SummaryKey = "summary";
+    
+    /// <summary>
+    /// Key for the updated time.
+    /// </summary>
+    private const string UpdatedKey = "updated";
     
     /// <summary>
     /// Key for the parsed contents.
@@ -282,8 +288,8 @@ public static class Core
             string[] file = File.ReadAllText(files[i]).Split("\n");
 
             // Index the authors formatted nicely.
-            string authors = file.Length > 2 ? file[2] : string.Empty;
-            for (int j = 3; j < file.Length; j++)
+            string authors = file.Length > 3 ? file[3] : string.Empty;
+            for (int j = 4; j < file.Length; j++)
             {
                 authors += $"|{file[j]}";
             }
@@ -294,6 +300,7 @@ public static class Core
                 new StringField(IdKey, id, Field.Store.YES),
                 new StringField(TitleKey, file[0], Field.Store.YES),
                 new StringField(SummaryKey, file[1], Field.Store.YES),
+                new StringField(UpdatedKey, file[2], Field.Store.YES),
                 new StringField(AuthorsKey, authors, Field.Store.YES),
                 new TextField(ContentsKey, Preprocess($"{file[0]} {file[1]}"), Field.Store.YES)
             });
@@ -369,7 +376,8 @@ public static class Core
                 ArXivId = doc.Get(IdKey) ?? string.Empty,
                 Title = doc.Get(TitleKey) ?? string.Empty,
                 Summary = doc.Get(SummaryKey) ?? string.Empty,
-                Authors = authors.ToArray()
+                Authors = authors.ToArray(),
+                Updated = DateTime.Parse(doc.Get(UpdatedKey))
             };
         }
 
