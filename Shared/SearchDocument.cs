@@ -43,8 +43,8 @@ public class SearchDocument
     /// <returns>The formatted string.</returns>
     public string Format(bool id = false, bool authors = false, bool html = false)
     {
-        // Add the URL if we should.
-        string result = id && Id != null ? $"URL: {Id}" : string.Empty;
+        // Add the ID if we should.
+        string result = id && Id != null ? $"ID: {Id}" : string.Empty;
 
         // Add the title if it exists.
         if (Title != null)
