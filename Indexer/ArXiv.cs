@@ -154,7 +154,7 @@ public static partial class ArXiv
                 foreach (SearchDocument document in documents)
                 {
                     // If the file already exists in any category, there is no need to write it again.
-                    if (document.Id == null || allFiles.Contains(document.Id))
+                    if (document.ArXivId == null || allFiles.Contains(document.ArXivId))
                     {
                         continue;
                     }
@@ -167,8 +167,8 @@ public static partial class ArXiv
                     }
 
                     // Write to the new file.
-                    await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{document.Id}.txt"), contents);
-                    allFiles.Add(document.Id);
+                    await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{document.ArXivId}.txt"), contents);
+                    allFiles.Add(document.ArXivId);
 
                     // If we have enough documents, stop.
                     Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | {--categoryTotalResults} Remaining");
@@ -263,7 +263,7 @@ public static partial class ArXiv
             // Add the document.
             documents.Add(new()
             {
-                Id = id,
+                ArXivId = id,
                 Title = title,
                 Summary = summary,
                 Authors = GetAuthors(entry)

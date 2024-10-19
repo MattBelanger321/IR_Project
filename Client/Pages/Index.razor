@@ -25,8 +25,12 @@
         @foreach (SearchDocument? document in _documents)
         {
             <div class="section">
-                <h1><a href="https://arxiv.org/abs/@document.Id" target="_blank">@document.Title</a></h1>
+                <h1><a href="https://arxiv.org/abs/@document.ArXivId" target="_blank">@document.Title</a></h1>
                 <b>@MarkupAuthors(document)</b><br/>
+                @if (document.IndexId.HasValue)
+                {
+                    <button style="margin: 15px;" @onclick="() => Search(document)">Related Papers</button>
+                }
                 <p style="text-align: justify">@document.Summary</p>
                 <hr/>
             </div>
@@ -67,6 +71,35 @@
         }
         
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    /// <summary>
+    /// Search for related documents by passing the document ID.
+    /// </summary>
+    /// <param name="document">The ID to find related documents for.</param>
+    private async Task Search(SearchDocument document)
+    {
+        // Can't do anything if there is no indexed value.
+        if (!document.IndexId.HasValue)
+        {
+            return;
+        }
+        
+        // Search for similar documents.
+        _documents = null;
+        SearchDocument[]? documents = await Http.GetFromJsonAsync<SearchDocument[]>($"SearchEngine?id={document.IndexId.Value}");
+        
+        // If there was an error, just keep the current document.
+        if (documents == null)
+        {
+            _documents = new[] { document };
+            return;
+        }
+
+        // Otherwise, show similar documents, ensuring the document we searched for is at the top of the.
+        List<SearchDocument> composed = new() {document};
+        composed.AddRange(documents.Where(x => x.IndexId != document.IndexId));
+        _documents = composed.ToArray();
     }
 
     /// <summary>

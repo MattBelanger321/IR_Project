@@ -3,6 +3,7 @@ using Lucene.Net.Analysis;
 using Lucene.Net.Analysis.TokenAttributes;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
+using Lucene.Net.Queries.Mlt;
 using Lucene.Net.QueryParsers.Classic;
 using Lucene.Net.Search;
 using Lucene.Net.Store;
@@ -308,24 +309,42 @@ public static class Core
     /// Search for documents.
     /// </summary>
     /// <param name="queryString">What we are searching for.</param>
+    /// <param name="id">The ID for a similar document.</param>
     /// <param name="count">The number of documents to retrieve at most.</param>
     /// <returns>The documents best matching the query.</returns>
-    public static SearchDocument[] Search(string queryString, int count = Count)
+    public static SearchDocument[] Search(string? queryString = null, int? id = null, int count = Count)
     {
         // Load our index.
         using FSDirectory? indexDirectory = FSDirectory.Open(GetIndexDirectory());
         using DirectoryReader? reader = DirectoryReader.Open(indexDirectory);
         IndexSearcher searcher = new(reader);
 
-        // Preprocess our input.
-        queryString = Preprocess(queryString);
+        // If an ID was passed, look for similar documents.
+        Query query;
+        if (id != null)
+        {
+            // Default standard documents similarity.
+            MoreLikeThis mlt = new(reader)
+            {
+                Analyzer = LoadAnalyzer(),
+                MinTermFreq = 1,
+                MinDocFreq = 1,
+                FieldNames = new[] {ContentsKey}
+            };
+            query = mlt.Like(id.Value);
+        }
+        else
+        {
+            // Preprocess our input.
+            queryString = Preprocess(queryString ?? string.Empty);
         
-        // Build the query.
-        Query query =
-            // If the query was empty, match all documents.
-            string.IsNullOrWhiteSpace(queryString) ? new MatchAllDocsQuery() :
-            // Otherwise, search the contents.
-            new QueryParser(Version, ContentsKey, LoadAnalyzer()).Parse(queryString);
+            // Build the query.
+            query =
+                // If the query was empty, match all documents.
+                string.IsNullOrWhiteSpace(queryString) ? new MatchAllDocsQuery() :
+                    // Otherwise, search the contents.
+                    new QueryParser(Version, ContentsKey, LoadAnalyzer()).Parse(queryString);
+        }
 
         // Load the information for the documents.
         TopDocs topDocs = searcher.Search(query, count < 1 ? 1 : count);
@@ -346,7 +365,8 @@ public static class Core
             // Add the document.
             documents[i] = new()
             {
-                Id = doc.Get(IdKey) ?? string.Empty,
+                IndexId = topDocs.ScoreDocs[i].Doc,
+                ArXivId = doc.Get(IdKey) ?? string.Empty,
                 Title = doc.Get(TitleKey) ?? string.Empty,
                 Summary = doc.Get(SummaryKey) ?? string.Empty,
                 Authors = authors.ToArray()
