@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Lucene.Net.Analysis;
 using Lucene.Net.Analysis.TokenAttributes;
 using Lucene.Net.Documents;
@@ -25,11 +24,6 @@ public static class Core
     /// The version of Lucene.
     /// </summary>
     public const LuceneVersion Version = LuceneVersion.LUCENE_48;
-    
-    /// <summary>
-    /// The name of the dataset.
-    /// </summary>
-    private const string Dataset = "arXiv";
     
     /// <summary>
     /// Key for the IDs.
@@ -94,7 +88,7 @@ public static class Core
 
         // Load the raw key terms.
         SortedSet<string> keyTerms = new();
-        TermsCollection.Load(keyTerms, GetFilePath(KeyTermsFile));
+        TermsCollection.Load(keyTerms, Values.GetFilePath(KeyTermsFile));
 
         // Loop through all the key terms.
         foreach (string s in keyTerms)
@@ -181,37 +175,12 @@ public static class Core
     }
 
     /// <summary>
-    /// Get the path to a file.
-    /// </summary>
-    /// <param name="fileName">The name of the file.</param>
-    /// <returns>The path to the file.</returns>
-    public static string GetFilePath(string fileName)
-    {
-        return Path.Combine(GetRootDirectory() ?? string.Empty, fileName);
-    }
-    
-    /// <summary>
-    /// Get the root directory of the project.
-    /// </summary>
-    /// <returns></returns>
-    public static string? GetRootDirectory()
-    {
-        // Traverse upwards to find the project root, as .NET projects are nested deeper with how they run.
-        return Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.FullName;
-    }
-    
-    /// <summary>
-    /// Get the dataset directory.
-    /// </summary>
-    public static string GetDataset => Path.Combine(GetRootDirectory() ?? string.Empty, Dataset);
-
-    /// <summary>
     /// Get the index directory.
     /// </summary>
     /// <returns></returns>
     private static string GetIndexDirectory()
     {
-        string directoryName = GetDataset + "_index";
+        string directoryName = Values.GetDataset + "_index";
         
         // Ensure the index directory exists.
         if (!Directory.Exists(directoryName))
@@ -230,7 +199,7 @@ public static class Core
     {
         if (Stems.Count < 1)
         {
-            TermsCollection.Load(Stems, GetFilePath(StemsFile));
+            TermsCollection.Load(Stems, Values.GetFilePath(StemsFile));
         }
         
         return new CustomAnalyzer(Stems);
@@ -263,7 +232,12 @@ public static class Core
             searcher = null;
         }
 
-        string[] files = Directory.GetFiles(GetDataset, "*.*", SearchOption.AllDirectories);
+        // Get all files.
+        string directory = Values.GetDataset;
+        string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
+        
+        // Get the directory that summaries could be in.
+        string summariesDirectory = $"{directory}{Values.Summaries}";
 
         // Iterate over all files in our dataset.
         for (int i = 0; i < files.Length; i++)
@@ -289,12 +263,16 @@ public static class Core
                 authors += $"|{file[j]}";
             }
 
+            // Try and load the LLM summary if it exists.
+            string summary = Path.Combine(summariesDirectory, $"{id}.txt");
+            summary = File.Exists(summary) ? File.ReadAllText(summary) : file[1];
+
             // Build and add the document.
             writer.AddDocument(new Document
             {
                 new StringField(IdKey, id, Field.Store.YES),
                 new StringField(TitleKey, file[0], Field.Store.YES),
-                new StringField(SummaryKey, file[1], Field.Store.YES),
+                new StringField(SummaryKey, summary, Field.Store.YES),
                 new StringField(UpdatedKey, file[2], Field.Store.YES),
                 new StringField(AuthorsKey, authors, Field.Store.YES),
                 new TextField(ContentsKey, Preprocess($"{file[0]} {file[1]}"), Field.Store.YES)
