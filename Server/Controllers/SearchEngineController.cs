@@ -30,10 +30,12 @@ public class SearchEngineController : ControllerBase
     /// </summary>
     /// <param name="query">The search query from the user.</param>
     /// <param name="id">The ID for searching for a similar document.</param>
+    /// <param name="start">The starting index for searching.</param>
+    /// <param name="count">The number of results to get.</param>
     /// <returns>The best results for the query.</returns>
     [HttpGet]
-    public IEnumerable<SearchDocument> Get([FromQuery] string? query = null, [FromQuery] int? id = null)
+    public IEnumerable<SearchDocument> Get([FromQuery] string? query = null, [FromQuery] int? id = null, [FromQuery] int? start = 0, [FromQuery] int? count = Values.SearchCount)
     {
-        return Core.Search(query, id);
+        return Core.Search(query, id, start ?? 0, count ?? Values.SearchCount);
     }
 }

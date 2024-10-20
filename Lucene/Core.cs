@@ -72,11 +72,6 @@ public static class Core
     private const string KeyTermsFile = "terms.txt";
 
     /// <summary>
-    /// The default search results to return.
-    /// </summary>
-    private const int Count = 100;
-
-    /// <summary>
     /// All mappings for key terms.
     /// </summary>
     private static readonly SortedSet<TermMappings> Mappings = new();
@@ -317,9 +312,10 @@ public static class Core
     /// </summary>
     /// <param name="queryString">What we are searching for.</param>
     /// <param name="id">The ID for a similar document.</param>
+    /// <param name="start">The starting search index.</param>
     /// <param name="count">The number of documents to retrieve at most.</param>
     /// <returns>The documents best matching the query.</returns>
-    public static SearchDocument[] Search(string? queryString = null, int? id = null, int count = Count)
+    public static SearchDocument[] Search(string? queryString = null, int? id = null, int start = 0, int count = Values.SearchCount)
     {
         // Load our index.
         using FSDirectory? indexDirectory = FSDirectory.Open(GetIndexDirectory());
@@ -353,13 +349,23 @@ public static class Core
                     new QueryParser(Version, ContentsKey, LoadAnalyzer()).Parse(queryString);
         }
 
+        if (start < 0)
+        {
+            start = 0;
+        }
+
+        if (count < 1)
+        {
+            count = 1;
+        }
+
         // Load the information for the documents.
-        TopDocs topDocs = searcher.Search(query, count < 1 ? 1 : count);
-        SearchDocument[] documents = new SearchDocument[topDocs.ScoreDocs.Length];
+        TopDocs topDocs = searcher.Search(query, start + count);
+        SearchDocument[] documents = new SearchDocument[Math.Min(count, topDocs.ScoreDocs.Length - start)];
         for (int i = 0; i < documents.Length; i++)
         {
             // Get the document.
-            Document doc = searcher.Doc(topDocs.ScoreDocs[i].Doc);
+            Document doc = searcher.Doc(topDocs.ScoreDocs[i + start].Doc);
             
             // Build the authors.
             List<string> authors = new();
