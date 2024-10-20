@@ -4,6 +4,14 @@
 - Written in [C# .NET](https://dotnet.microsoft.com ".NET").
 - Uses [Lucene.NET](https://lucenenet.apache.org "Lucene.NET") for indexing.
 
+# Features
+
+- Download entries from [arXiv](https://arxiv.org "arXiv") to be indexed by [Lucene.NET](https://lucenenet.apache.org "Lucene.NET").
+- The indexing and searching has lemmatization of key terms, stemming using both a custom and Porter stemmer, and stop words removal.
+    - Custom key terms and stems can be added via text files.
+- Search by either query or find similar papers to a specific one.
+- Infinite scroll to load more results.
+
 # Getting Started
 
 1. You need to have the required [.NET](https://dotnet.microsoft.com ".NET") tools intalled.
@@ -55,4 +63,19 @@
 - The second line contains the abstract.
 - The third line has the date and time in the format of "YYYY-DD-MM hh:mm:ss".
 - The fourth line and beyond lines each contain an author name, depending on how many authors there are for a given paper.
-- All text has been preprocessed, ensuring all whitespace has been replaced by single spaces.
+- All text has been preprocessed, ensuring all whitespace has been replaced by single spaces. Additionally, LaTeX/Markdown has been converted over to plain text.
+
+# Key Terms and Abbreviations
+
+- Our pipeline automatically replaces abbreviations with their term. For instance, "LLM" automatically becomes "Large Language Model". This ensures the indexing process treats a term and their abbreviation equally.
+- Key terms can be found in ``terms.txt``. These have the following format: ``term|abbreviation1|abbreviation2|...|abbreviationN``. You can have as many abbreviations as you want for a term. Everything is normalized to lowercase in our pipeline.
+- Our key terms builder automatically handles plurals. For instance, you only need to have ``large language model|llm`` and not ``large language model|llms`` or ``large language models|llms``.
+- The key terms also recognize and remove the instances where abbreviations are introduced. For instance, in a paper it is common to for instance write "Large Language Models (LLMs)" the first time large language models are introduced. Our pipeline will reduce all such instances of this to just the term. This is done so the indexing process only recognize this as the term being written once, and not twice as the second was just introducing the abbreviation to the reader. We make sure to capture all possible plural combinations. Examples of this are below:
+  - "Large Language Model (LLM)" becomes "Large Language Model".
+  - "Large Language Model (LLMs)" becomes "Large Language Model".
+  - "Large Language Models (LLM)" becomes "Large Language Models".
+  - "Large Language Models (LLMs)" becomes "Large Language Models".
+
+# Stems
+
+- Custom stems can be found in ``stems.txt``.

@@ -29,12 +29,12 @@ public static partial class ArXiv
     /// <summary>
     /// The default maximum number of results to get from arXiv at once.
     /// </summary>
-    private const int MaxResults = 10;
+    private const int MaxResults = 1000;
 
     /// <summary>
     /// The default total number of results we want for our own database.
     /// </summary>
-    private const int TotalResults = 10;
+    private const int TotalResults = 5000;
 
     /// <summary>
     /// All arXiv computer science categories.

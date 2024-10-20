@@ -16,13 +16,13 @@
     {
         <p style="text-align: center;"><em>Loading...</em></p>
     }
-    else if (_documents.Length == 0)
+    else if (_documents.Count == 0)
     {
-        <p style="text-align: center;">No documents.</p>
+        <p style="text-align: center;">No results.</p>
     }
     else
     {
-        @foreach (SearchDocument? document in _documents)
+        @foreach (SearchDocument document in _documents)
         {
             <div class="section">
                 <h1><a href="https://arxiv.org/abs/@document.ArXivId" target="_blank">@document.Title</a></h1>
@@ -36,20 +36,36 @@
                 <hr/>
             </div>
         }
+        @if (_moreButton)
+        {
+            <button class="section" @onclick="More">Load More</button>
+        }
     }
 </div>
 
 @code
 {
+    private static readonly string QueryBase = $"SearchEngine?count={Values.SearchCount}";
+    
     /// <summary>
     /// The documents that have been loaded.
     /// </summary>
-    private SearchDocument[]? _documents;
+    private List<SearchDocument>? _documents;
 
     /// <summary>
     /// The input for searching.
     /// </summary>
     private readonly SearchModel _searchModel = new();
+
+    /// <summary>
+    /// The ID of the paper to load similar papers to.
+    /// </summary>
+    private int? _id;
+
+    /// <summary>
+    /// If the button to load more should be shown or not.
+    /// </summary>
+    private bool _moreButton;
 
     /// <summary>
     /// Called when the page loads.
@@ -87,20 +103,26 @@
         }
         
         // Search for similar documents.
+        _searchModel.Query = string.Empty;
+        _id = document.IndexId.Value;
         _documents = null;
-        SearchDocument[]? documents = await Http.GetFromJsonAsync<SearchDocument[]>($"SearchEngine?id={document.IndexId.Value}");
+        _moreButton = false;
+        List<SearchDocument>? documents = await Http.GetFromJsonAsync<List<SearchDocument>>($"{QueryBase}&id={_id}");
         
         // If there was an error, just keep the current document.
-        if (documents == null)
+        if (documents == null || documents.Count < 1)
         {
-            _documents = new[] { document };
+            _documents = new() {document};
             return;
         }
 
-        // Otherwise, show similar documents, ensuring the document we searched for is at the top of the page.
+        // Enable the button if the full amount of results got returned, as otherwise we have reached the end.
+        _moreButton = documents.Count >= Values.SearchCount;
+
+        // Show similar documents, ensuring the document we searched for is at the top of the page.
         List<SearchDocument> composed = new() {document};
         composed.AddRange(documents.Where(x => x.IndexId != document.IndexId));
-        _documents = composed.ToArray();
+        _documents = composed;
     }
 
     /// <summary>
@@ -108,34 +130,77 @@
     /// </summary>
     private async Task Search()
     {
-        string url = "SearchEngine";
+        string url = QueryBase;
 
         bool hasQuery = !string.IsNullOrWhiteSpace(_searchModel.Query);
         // If the query is not empty, set it for our API.
         if (hasQuery)
         {
-            url += $"?query={_searchModel.Query}";
+            url += $"&query={_searchModel.Query}";
         }
         
         // Clear the existing documents and then get the new documents.
+        _id = null;
         _documents = null;
-        SearchDocument[]? documents = await Http.GetFromJsonAsync<SearchDocument[]>(url);
+        _moreButton = false;
+        List<SearchDocument>? documents = await Http.GetFromJsonAsync<List<SearchDocument>>(url);
         
         // If there are no documents, then there is nothing to do.
-        if (documents == null)
+        if (documents == null || documents.Count < 1)
         {
             return;
         }
 
-        // If there was a query, display the documents as they have been found.
-        if (hasQuery)
+        // Set the new documents.
+        _documents = documents;
+        
+        // Enable the button if the full amount of results got returned, as otherwise we have reached the end.
+        _moreButton = _documents.Count >= Values.SearchCount;
+    }
+
+    /// <summary>
+    /// Load more results.
+    /// </summary>
+    private async Task More()
+    {
+        if (!_moreButton)
         {
-            _documents = documents;
+            return;
+        }
+        
+        // Continue from where we have left off with our current results.
+        string url = $"{QueryBase}&start={_documents?.Count ?? 0}";
+        
+        // If this has an ID for a document, load more similar documents.
+        if (_id.HasValue)
+        {
+            url += $"&id={_id}";
+            _searchModel.Query = string.Empty;
+        }
+        else if (!string.IsNullOrWhiteSpace(_searchModel.Query))
+        {
+            url += $"&query={_searchModel.Query}";
+        }
+
+        // Load more documents.
+        _moreButton = false;
+        List<SearchDocument>? documents = await Http.GetFromJsonAsync<List<SearchDocument>>(url);
+        
+        // If there was an error or no other documents were returned, there is nothing to do.
+        if (documents == null || documents.Count < 1)
+        {
             return;
         }
 
-        // If there was no query, order documents from newest to oldest, breaking ties with the title.
-        _documents = documents.OrderByDescending(x => x.Updated).ThenBy(x => x.Title).ToArray();
+        // Add all new documents to the list (this check is realistically just a failsafe).
+        _documents ??= new();
+        foreach (SearchDocument document in documents.Where(document => !_documents.Exists(x => x.ArXivId == document.ArXivId)))
+        {
+            _documents.Add(document);
+        }
+
+        // Enable the button if the full amount of results got returned, as otherwise we have reached the end.
+        _moreButton = documents.Count >= Values.SearchCount;
     }
 
     /// <summary>
