@@ -2,7 +2,7 @@
 using SearchEngine.Lucene;
 
 // Get all the documents to build our dataset.
-await ArXiv.SaveDocumentsGetLinksAsync();
+//await ArXiv.SaveDocumentsGetLinksAsync();
 
 // Try to summarize documents.
 if (await Ollama.Summarize())

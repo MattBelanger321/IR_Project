@@ -11,6 +11,7 @@ using Lucene.Net.Util;
 using SearchEngine.Lucene.Analyzing;
 using SearchEngine.Lucene.Utility;
 using SearchEngine.Shared;
+using WeCantSpell.Hunspell;
 using Directory = System.IO.Directory;
 
 namespace SearchEngine.Lucene;
@@ -64,6 +65,26 @@ public static class Core
     /// The name of the key terms file.
     /// </summary>
     private const string KeyTermsFile = "terms.txt";
+
+    /// <summary>
+    /// The language for spell checking.
+    /// </summary>
+    private const string Language = "en_US";
+
+    /// <summary>
+    /// The number of times to attempt spell correction.
+    /// </summary>
+    private const int Attempts = 5;
+    
+    /// <summary>
+    /// Spell checking affinity file.
+    /// </summary>
+    private static readonly string AffinityFile = Values.GetFilePath($"{Language}.aff");
+    
+    /// <summary>
+    /// Spell checking dictionary file.
+    /// </summary>
+    private static readonly string DictionaryFile = Values.GetFilePath($"{Language}.dic");
 
     /// <summary>
     /// All mappings for key terms.
@@ -292,9 +313,12 @@ public static class Core
     /// <param name="id">The ID for a similar document.</param>
     /// <param name="start">The starting search index.</param>
     /// <param name="count">The number of documents to retrieve at most.</param>
-    /// <returns>The documents best matching the query.</returns>
-    public static SearchDocument[] Search(string? queryString = null, int? id = null, int start = 0, int count = Values.SearchCount)
+    /// <param name="attempts">The number of times to attempt spell correction.</param>
+    /// <returns>The results of the query.</returns>
+    public static QueryResult Search(string? queryString = null, int? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts)
     {
+        QueryResult result = new();
+        
         // Load our index.
         using FSDirectory? indexDirectory = FSDirectory.Open(GetIndexDirectory());
         using DirectoryReader? reader = DirectoryReader.Open(indexDirectory);
@@ -339,8 +363,64 @@ public static class Core
 
         // Load the information for the documents.
         TopDocs topDocs = searcher.Search(query, start + count);
-        SearchDocument[] documents = new SearchDocument[Math.Min(count, topDocs.ScoreDocs.Length - start)];
-        for (int i = 0; i < documents.Length; i++)
+        
+        // If there were no results, try again with spelling correction.
+        if (topDocs.ScoreDocs.Length < 1 && id == null && !string.IsNullOrWhiteSpace(queryString))
+        {
+            if (attempts < 1)
+            {
+                attempts = 1;
+            }
+            
+            using FileStream dictionaryStream = File.OpenRead(DictionaryFile);
+            using FileStream affixStream = File.OpenRead(AffinityFile);
+            WordList dictionary = WordList.CreateFromStreams(dictionaryStream, affixStream);
+            
+            for (int i = 0; i < attempts; i++)
+            {
+                // Split into every word.
+                string[] words = queryString.Split(' ');
+                for (int j = 0; j < words.Length; j++)
+                {
+                    // If this already has a correct spelling, leave it.
+                    if (dictionary.Check(words[j]))
+                    {
+                        continue;
+                    }
+                    
+                    // Get suggestions, using the first if there is one.
+                    string[] suggestions = dictionary.Suggest(words[j]).ToArray();
+                    if (suggestions is { Length: > 0 })
+                    {
+                        // Use the first suggestion.
+                        words[j] = suggestions[0];
+                    }
+                }
+
+                // Built the corrected string.
+                string correctedQuery = Preprocess(string.Join(" ", words));
+                
+                // If the strings are equal, there is nothing else to change.
+                if (queryString == correctedQuery)
+                {
+                    break;
+                }
+
+                // Otherwise, run another search.
+                queryString = correctedQuery;
+                result.CorrectedQuery = queryString;
+                topDocs = searcher.Search(new QueryParser(Version, ContentsKey, LoadAnalyzer()).Parse(queryString), start + count);
+                
+                // If there was results, continue.
+                if (topDocs.ScoreDocs.Length > 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        int number = Math.Min(count, topDocs.ScoreDocs.Length - start);
+        for (int i = 0; i < number; i++)
         {
             // Get the document.
             Document doc = searcher.Doc(topDocs.ScoreDocs[i + start].Doc);
@@ -354,7 +434,7 @@ public static class Core
             }
             
             // Add the document.
-            documents[i] = new()
+            result.SearchDocuments.Add(new()
             {
                 IndexId = topDocs.ScoreDocs[i].Doc,
                 ArXivId = doc.Get(IdKey) ?? string.Empty,
@@ -362,10 +442,10 @@ public static class Core
                 Summary = doc.Get(SummaryKey) ?? string.Empty,
                 Authors = authors.ToArray(),
                 Updated = DateTime.Parse(doc.Get(UpdatedKey))
-            };
+            });
         }
 
-        return documents;
+        return result;
     }
 
     /// <summary>

@@ -1,18 +1,13 @@
 ﻿# Search Engine
 
-- Allows for querying papers from [arXiv](https://arxiv.org "arXiv").
 - Written in [C# .NET](https://dotnet.microsoft.com ".NET").
-- Uses [Lucene.NET](https://lucenenet.apache.org "Lucene.NET") for indexing.
-- Uses [Ollama](https://ollama.com "Ollama") to produce precise summaries with a local large language model.
-
-# Features
-
 - Download entries from [arXiv](https://arxiv.org "arXiv") to be indexed by [Lucene.NET](https://lucenenet.apache.org "Lucene.NET").
 - The indexing and searching has lemmatization of key terms, stemming using both a custom and Porter stemmer, and stop words removal.
     - Custom key terms and stems can be added via text files.
 - Search by either query or find similar papers to a specific one.
 - Infinite scroll to load more results.
-- Short summaries produced by [Ollama](https://ollama.com "Ollama").
+- Uses [Ollama](https://ollama.com "Ollama") to produce concise summaries with a local large language model.
+- Uses [Hunspell](https://hunspell.github.io) for spell correction.
 
 # Getting Started
 
