@@ -34,7 +34,7 @@ public class SearchEngineController : ControllerBase
     /// <param name="count">The number of results to get.</param>
     /// <returns>The best results for the query.</returns>
     [HttpGet]
-    public IEnumerable<SearchDocument> Get([FromQuery] string? query = null, [FromQuery] int? id = null, [FromQuery] int? start = 0, [FromQuery] int? count = Values.SearchCount)
+    public QueryResult Get([FromQuery] string? query = null, [FromQuery] int? id = null, [FromQuery] int? start = 0, [FromQuery] int? count = Values.SearchCount)
     {
         return Core.Search(query, id, start ?? 0, count ?? Values.SearchCount);
     }

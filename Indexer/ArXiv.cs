@@ -1,7 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Markdig;
-using SearchEngine.Lucene;
 using SearchEngine.Shared;
 
 namespace Indexer;
@@ -116,7 +115,7 @@ public static partial class ArXiv
         };
 
         // Ensure the directory to save raw files exists.
-        string directoryPath = Core.GetFilePath(Core.GetDataset);
+        string directoryPath = Values.GetDataset;
         if (!Directory.Exists(directoryPath))
         {
             Directory.CreateDirectory(directoryPath);
@@ -357,7 +356,7 @@ public static partial class ArXiv
     /// </summary>
     /// <param name="s">The string to clean.</param>
     /// <returns>The string with all whitespaces replaced by spaces and trimmed.</returns>
-    private static string CleanString(string s)
+    public static string CleanString(string s)
     {
         return CleanWhitespaceRegex().Replace(ConvertToPlainText(s), " ").Trim();
     }
