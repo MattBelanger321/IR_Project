@@ -9,11 +9,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="6.0.7" />
+    <PackageReference Include="Porter2Stemmer" Version="1.0.0" />
+    <PackageReference Include="Qdrant.Client" Version="1.12.0" />
+    <PackageReference Include="WeCantSpell.Hunspell" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Client\SearchEngine.WebClient.csproj" />
-    <ProjectReference Include="..\Lucene\Lucene.csproj" />
     <ProjectReference Include="..\Shared\SearchEngine.WebShared.csproj" />
   </ItemGroup>
 
