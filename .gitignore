@@ -430,8 +430,13 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Do not keep the indexed data.
+# Do not keep the arXiv data.
 arXiv/
-arXiv_index/
 arXiv_summaries/
-/.vscode
+arXiv_processed/
+
+# Python Virtual Environment
+venv/
+
+# VS Code Cache
+.vscode/

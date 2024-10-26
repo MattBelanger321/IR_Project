@@ -21,9 +21,9 @@ public class SearchDocument
     public string? ArXivId { get; set; }
     
     /// <summary>
-    /// The Lucene index ID.
+    /// The vector database index ID.
     /// </summary>
-    public int? IndexId { get; set; }
+    public ulong? IndexId { get; set; }
     
     /// <summary>
     /// The authors of the document.

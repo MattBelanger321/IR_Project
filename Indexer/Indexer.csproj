@@ -9,11 +9,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Lucene\Lucene.csproj" />
+      <PackageReference Include="Markdig" Version="0.37.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Markdig" Version="0.37.0" />
+      <ProjectReference Include="..\Server\SearchEngine.WebServer.csproj" />
+      <ProjectReference Include="..\Shared\SearchEngine.WebShared.csproj" />
     </ItemGroup>
 
 </Project>
