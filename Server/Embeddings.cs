@@ -425,14 +425,22 @@ public static class Embeddings
         {
             await VectorDatabase.DeleteCollectionAsync(VectorCollectionName);
         }
+        catch
+        {
+            // Ignored.
+        }
+        
+        // Create our vector database.
+        try
+        {
+            await VectorDatabase.CreateCollectionAsync(VectorCollectionName, new VectorParams { Size = _vectorSize, Distance = Distance.Cosine });
+        }
         catch (Exception e)
         {
             Console.Error.WriteLine(e);
             return;
         }
         
-        // Create our vector database.
-        await VectorDatabase.CreateCollectionAsync(VectorCollectionName, new VectorParams { Size = _vectorSize, Distance = Distance.Cosine });
         
         // Get existing summaries.
         string summariesDirectory = $"{directory}{Values.Summaries}";
