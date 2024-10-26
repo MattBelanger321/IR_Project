@@ -37,7 +37,7 @@
 ## Serving
 
 1. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
-2. Run ``Server: IIS Express``.
+2. Run ``Server: IIS Express`` or ``Server``.
 
 # Project Structure
 

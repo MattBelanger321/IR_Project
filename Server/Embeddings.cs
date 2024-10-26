@@ -13,7 +13,7 @@ namespace SearchEngine.Server;
 /// <summary>
 /// Core embeddings properties and methods.
 /// </summary>
-public static class Embeddings
+public static partial class Embeddings
 {
     /// <summary>
     /// Key for the IDs.
@@ -88,23 +88,23 @@ public static class Embeddings
     /// <summary>
     /// All mappings for key terms.
     /// </summary>
-    private static readonly SortedSet<TermMappings> Mappings = new();
+    private static readonly SortedSet<TermMappings> Mappings = [];
 
     /// <summary>
     /// All stems.
     /// </summary>
-    private static readonly SortedSet<string> Stems = new();
+    private static readonly SortedSet<string> Stems = [];
 
     /// <summary>
     /// All stop words.
     /// </summary>
-    private static readonly HashSet<string> StopWords = new()
-    {
+    private static readonly HashSet<string> StopWords =
+    [
         "a", "an", "and", "are", "as", "at", "be",
         "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on",
         "or", "such", "that", "the", "their", "then", "there", "these", "they", "this",
         "to", "was", "will", "with"
-    };
+    ];
 
     /// <summary>
     /// The string builder for preprocessing.
@@ -142,8 +142,15 @@ public static class Embeddings
             return;
         }
 
+        string path = Values.GetFilePath(EmbeddingsFile);
+        if (!File.Exists(path))
+        {
+            Console.Error.WriteLine($"Embeddings file {EmbeddingsFile} does not exist.");
+            return;
+        }
+
         // Read the embeddings file.
-        string[] lines = File.ReadLines(Values.GetFilePath(EmbeddingsFile)).ToArray();
+        string[] lines = File.ReadLines(path).ToArray();
         
         // The first word of the first line is the number of vectors there are.
         _vectorSize = ulong.Parse(lines.First().Split(' ')[1]);
@@ -242,14 +249,14 @@ public static class Embeddings
         }
 
         // LoadCollection the raw key terms.
-        SortedSet<string> keyTerms = new();
+        SortedSet<string> keyTerms = [];
         LoadCollection(keyTerms, Values.GetFilePath(KeyTermsFile));
 
         // Loop through all the key terms.
         foreach (string s in keyTerms)
         {
             // Replace whitespaces with single spaces and lowercase everything, and then split the terms.
-            string[] splits = Regex.Replace(s, @"\s+", " ").ToLower().Split('|');
+            string[] splits = RemoveWhitespace().Replace(s, " ").ToLower().Split('|');
             
             // If there are no abbreviations, there is nothing to do.
             if (splits.Length < 2)
@@ -258,14 +265,14 @@ public static class Embeddings
             }
             
             // Build all the abbreviations.
-            SortedSet<string> abbreviations = new();
+            SortedSet<string> abbreviations = [];
             for (int i = 1; i < splits.Length; i++)
             {
                 // Add each abbreviation as it has been found.
                 abbreviations.Add(splits[i]);
 
                 // Get a version of the string without any special characters.
-                string cleaned = Regex.Replace(splits[i], "[^a-zA-Z0-9]", string.Empty);
+                string cleaned = AlphaNumerical().Replace(splits[i], string.Empty);
                 
                 // Add the cleaned version if it is different.
                 if (splits[i] != cleaned)
@@ -274,7 +281,7 @@ public static class Embeddings
                 }
             }
 
-            Mappings.Add(new(Regex.Replace(Regex.Replace(splits[0], "[^a-zA-Z0-9]+", " "), @"\s+", " ").Trim(), abbreviations));
+            Mappings.Add(new(RemoveWhitespace().Replace(AlphaNumericalPlus().Replace(splits[0], " "), " ").Trim(), abbreviations));
         }
     }
 
@@ -289,7 +296,7 @@ public static class Embeddings
         LoadMappings();
         
         // Remove all non-alphanumeric characters (keeping parentheses), then make whitespace into single spaces and lowercase everything.
-        s = Regex.Replace(Regex.Replace(s, "[^a-zA-Z0-9()]+", " "), @"\s+", " ").ToLower();
+        s = RemoveWhitespace().Replace(AlphaNumericalBrackets().Replace(s, " "), " ").ToLower();
         
         // Normalize the input string to FormD (decomposed form)
         s = s.Normalize(NormalizationForm.FormD);
@@ -376,7 +383,7 @@ public static class Embeddings
         }
         
         // See how many documents already exist.
-        HashSet<string> allFiles = new();
+        HashSet<string> allFiles = [];
         foreach (string s in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
         {
             allFiles.Add(Path.GetFileNameWithoutExtension(s));
@@ -441,10 +448,9 @@ public static class Embeddings
             return;
         }
         
-        
         // Get existing summaries.
         string summariesDirectory = $"{directory}{Values.Summaries}";
-        HashSet<string> summaries = new();
+        HashSet<string> summaries = [];
         if (Directory.Exists(summariesDirectory))
         {
             foreach (string file in Directory.GetFiles(summariesDirectory, "*.*", SearchOption.AllDirectories))
@@ -455,7 +461,7 @@ public static class Embeddings
         
         // Get existing preprocessed contents.
         string processedDirectory = $"{directory}{Processed}";
-        HashSet<string> processed = new();
+        HashSet<string> processed = [];
         if (Directory.Exists(processedDirectory))
         {
             foreach (string file in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
@@ -609,30 +615,65 @@ public static class Embeddings
         }
 
         // Run the query.
-        IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, limit: (ulong) (start + count));
-        int number = Math.Min(count, points.Count - start);
-        for (int i = 0; i < number; i++)
+        try
         {
-            // Build the authors.
-            List<string> authors = new();
-            string rawAuthors = points[i].Payload[AuthorsKey].StringValue;
-            if (rawAuthors != null)
+            IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, limit: (ulong)(start + count));
+            int number = Math.Min(count, points.Count - start);
+            for (int i = 0; i < number; i++)
             {
-                authors.AddRange(rawAuthors.Split('|'));
+                // Build the authors.
+                List<string> authors = [];
+                string rawAuthors = points[i].Payload[AuthorsKey].StringValue;
+                if (rawAuthors != null)
+                {
+                    authors.AddRange(rawAuthors.Split('|'));
+                }
+
+                // Add the document.
+                result.SearchDocuments.Add(new()
+                {
+                    IndexId = points[i].Id.Num,
+                    ArXivId = points[i].Payload[IdKey].StringValue,
+                    Title = points[i].Payload[TitleKey].StringValue,
+                    Summary = points[i].Payload[SummaryKey].StringValue,
+                    Authors = authors.ToArray(),
+                    Updated = DateTime.Parse(points[i].Payload[UpdatedKey].StringValue)
+                });
             }
-            
-            // Add the document.
-            result.SearchDocuments.Add(new()
-            {
-                IndexId = points[i].Id.Num,
-                ArXivId = points[i].Payload[IdKey].StringValue,
-                Title = points[i].Payload[TitleKey].StringValue,
-                Summary = points[i].Payload[SummaryKey].StringValue,
-                Authors = authors.ToArray(),
-                Updated = DateTime.Parse(points[i].Payload[UpdatedKey].StringValue)
-            });
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine(e);
         }
 
         return result;
     }
+
+    /// <summary>
+    /// Regex to replace whitespace.
+    /// </summary>
+    /// <returns>The regex to remove whitespace</returns>
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex RemoveWhitespace();
+    
+    /// <summary>
+    /// Get only the alphanumerical characters.
+    /// </summary>
+    /// <returns>Only the alphanumerical characters.</returns>
+    [GeneratedRegex("[^a-zA-Z0-9]")]
+    private static partial Regex AlphaNumerical();
+    
+    /// <summary>
+    /// Get only the alphanumerical characters of at least length one.
+    /// </summary>
+    /// <returns>Only the alphanumerical characters.</returns>
+    [GeneratedRegex("[^a-zA-Z0-9]+")]
+    private static partial Regex AlphaNumericalPlus();
+    
+    /// <summary>
+    /// Get only the alphanumerical characters and brackets.
+    /// </summary>
+    /// <returns>Only the alphanumerical characters and brackets.</returns>
+    [GeneratedRegex("[^a-zA-Z0-9()]+")]
+    private static partial Regex AlphaNumericalBrackets();
 }

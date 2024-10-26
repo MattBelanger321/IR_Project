@@ -13,5 +13,5 @@ public class QueryResult
     /// <summary>
     /// The documents returned from the query.
     /// </summary>
-    public List<SearchDocument> SearchDocuments { get; set; } = new();
+    public List<SearchDocument> SearchDocuments { get; set; } = [];
 }

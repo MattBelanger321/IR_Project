@@ -137,7 +137,7 @@
         // If there was an error, just keep the current document.
         if (result == null || result.SearchDocuments.Count < 1)
         {
-            _documents = new() {document};
+            _documents = [document];
             return;
         }
 
@@ -145,7 +145,7 @@
         _moreButton = result.SearchDocuments.Count >= Values.SearchCount;
 
         // Show similar documents, ensuring the document we searched for is at the top of the page.
-        List<SearchDocument> composed = new() {document};
+        List<SearchDocument> composed = [document];
         composed.AddRange(result.SearchDocuments.Where(x => x.IndexId != document.IndexId));
         _documents = composed;
     }
@@ -251,7 +251,7 @@
         }
 
         // Add all new documents to the list (this check is realistically just a failsafe).
-        _documents ??= new();
+        _documents ??= [];
         foreach (SearchDocument document in result.SearchDocuments.Where(document => !_documents.Exists(x => x.ArXivId == document.ArXivId)))
         {
             _documents.Add(document);
