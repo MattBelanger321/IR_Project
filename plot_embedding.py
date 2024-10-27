@@ -26,7 +26,7 @@ def load_data(file_path):
     data = []
     
     # Load the data, starting from the second line
-    for line in lines[1:1000]:
+    for line in lines[1:]:
         parts = line.strip().split()
         label = parts[0]  # First element is the label
         vector = list(map(float, parts[1:]))  # Remaining elements are the vector
@@ -52,7 +52,7 @@ def perform_pca(data, n_components=2):
     logging.info("PCA completed.")
     return reduced_data
 
-def perform_tsne(data, n_components=2, perplexity=30):
+def perform_tsne(data, n_components=2, perplexity=5):
     """Perform t-SNE on the data."""
     logging.info("Performing t-SNE...")
     tsne = TSNE(n_components=n_components, perplexity=perplexity)
@@ -63,7 +63,7 @@ def perform_tsne(data, n_components=2, perplexity=30):
 def plot(reduced_data, labels, output_file, title):
     """Plot the reduced data with labels and save it to a PNG file."""
     logging.info(f"Plotting and saving the output to {output_file}...")
-    plt.figure(figsize=(12, 24))
+    plt.figure(figsize=(256, 256))
     scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], alpha=0.7)
 
     # Adding labels to points
@@ -74,8 +74,8 @@ def plot(reduced_data, labels, output_file, title):
     plt.xlabel('Component 1')
     plt.ylabel('Component 2')
     plt.grid()
-    plt.savefig(output_file)
-    plt.show()
+    # plt.savefig(output_file, format='svg')
+    plt.savefig(f"{output_file}.png", format='png')
     logging.info(f"Interactive plot saved as {output_file}.png")
     plt.close()
     logging.info("Plot saved.")
