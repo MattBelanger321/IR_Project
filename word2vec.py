@@ -1,3 +1,5 @@
+## This application will make a vector embedding of our arXiv corpus
+
 import os
 
 from gensim.models import Word2Vec
