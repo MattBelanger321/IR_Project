@@ -89,9 +89,9 @@ def perform_pca(data, n_components=2):
     logging.info("PCA completed.")
     return reduced_data
 
-def perform_tsne(data, n_components=2, perplexity=5):
+def perform_tsne(data, n_components=2, perplexity=20):
     """Perform t-SNE on the data."""
-    logging.info("Performing t-SNE...")
+    logging.info(f"Performing t-SNE with perplexity={perplexity}...")
     tsne = TSNE(n_components=n_components, perplexity=perplexity)
     reduced_data = tsne.fit_transform(data)
     logging.info("t-SNE completed.")
@@ -100,7 +100,7 @@ def perform_tsne(data, n_components=2, perplexity=5):
 def plot(reduced_data, labels, output_file, title):
     """Plot the reduced data with labels and save it to a PNG file."""
     logging.info(f"Plotting and saving the output to {output_file}...")
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(100, 100))
     scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], alpha=0.7)
 
     # Adding labels to points
@@ -117,11 +117,17 @@ def plot(reduced_data, labels, output_file, title):
 
 def get_file_path(category):
     """Get the file path for the embeddings based on the selected category."""
+    base_dir = os.path.join(os.getcwd(), "embeddings")
+    
     if category:
-        category_path = os.path.join(os.getcwd(), "embeddings", category)
+        category_path = os.path.join(base_dir, category)
+        if not os.path.exists(category_path):
+            available_categories = os.listdir(base_dir)
+            logging.error(f"Category '{category}' does not exist. Available categories: {', '.join(available_categories)}")
+            raise ValueError(f"Invalid category '{category}'. Available categories: {', '.join(available_categories)}")
         return os.path.join(category_path, "embeddings.txt")
-    else:
-        return os.path.join(os.getcwd(), "embeddings", "embeddings.txt")  # Path for big model
+    
+    return os.path.join(base_dir, "embeddings.txt")  # Path for big model
 
 def main():
     # Set up argument parser
@@ -129,11 +135,17 @@ def main():
     parser.add_argument('--method', choices=['pca', 'tsne'], required=True, help="Analysis method: PCA or t-SNE.")
     parser.add_argument('--output', type=str, default='output', help="Output PNG file name (without extension).")
     parser.add_argument('--category', type=str, help="Select a category for analysis.")
+    parser.add_argument('--perplexity', type=int, default=20, help="Perplexity for t-SNE (default: 20).")
 
     args = parser.parse_args()
 
     # Get file path based on the specified category
-    file_path = get_file_path(args.category)
+    try:
+        file_path = get_file_path(args.category)
+    except ValueError as e:
+        logging.error(str(e))
+        return
+
     data, labels = load_data(file_path)
     if data.size == 0:
         logging.error("No data to process. Exiting.")
@@ -148,7 +160,7 @@ def main():
         reduced_data = perform_pca(numeric_data)
         title = 'PCA Analysis'
     elif args.method == 'tsne':
-        reduced_data = perform_tsne(numeric_data)
+        reduced_data = perform_tsne(numeric_data, perplexity=args.perplexity)
         title = 't-SNE Analysis'
 
     plot(reduced_data, labels, args.output, title=title)
