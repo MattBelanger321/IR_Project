@@ -19,22 +19,22 @@ public static partial class Embeddings
     /// Key for the IDs.
     /// </summary>
     private const string IdKey = "id";
-    
+
     /// <summary>
     /// Key for the titles.
     /// </summary>
     private const string TitleKey = "title";
-    
+
     /// <summary>
     /// Key for the authors.
     /// </summary>
     private const string AuthorsKey = "authors";
-    
+
     /// <summary>
     /// Key for the summaries.
     /// </summary>
     private const string SummaryKey = "summary";
-    
+
     /// <summary>
     /// Key for the updated time.
     /// </summary>
@@ -74,12 +74,12 @@ public static partial class Embeddings
     /// The number of times to attempt spell correction.
     /// </summary>
     private const int Attempts = 5;
-    
+
     /// <summary>
     /// Spell checking affinity file.
     /// </summary>
     private static readonly string AffinityFile = Values.GetFilePath($"{Language}.aff");
-    
+
     /// <summary>
     /// Spell checking dictionary file.
     /// </summary>
@@ -110,12 +110,12 @@ public static partial class Embeddings
     /// The string builder for preprocessing.
     /// </summary>
     private static readonly StringBuilder Builder = new();
-    
+
     /// <summary>
     /// The porter stemmer to run.
     /// </summary>
     private static readonly EnglishPorter2Stemmer Stemmer = new();
-    
+
     /// <summary>
     /// The word2vec generated vectors.
     /// </summary>
@@ -125,7 +125,7 @@ public static partial class Embeddings
     /// The size of the generated vectors.
     /// </summary>
     private static ulong _vectorSize;
-    
+
     /// <summary>
     /// Qdrant connection.
     /// </summary>
@@ -151,7 +151,7 @@ public static partial class Embeddings
 
         // Read the embeddings file.
         string[] lines = File.ReadLines(path).ToArray();
-        
+
         // The first word of the first line is the number of vectors there are.
         _vectorSize = ulong.Parse(lines.First().Split(' ')[1]);
 
@@ -173,7 +173,7 @@ public static partial class Embeddings
     {
         return GetEmbeddings(text, out int _);
     }
-    
+
     /// <summary>
     /// Get the embeddings for a string of text.
     /// </summary>
@@ -185,13 +185,13 @@ public static partial class Embeddings
         // Define the vector.
         size = 0;
         float[] vector = new float[_vectorSize];
-        
+
         // Check every term in the text.
         foreach (string word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
             // Get the vector embedding for this word.
             float[]? wordVector = Vectors.GetValueOrDefault(word);
-            
+
             // If there is no embedding for this word, discard it.
             if (wordVector == null)
             {
@@ -203,7 +203,7 @@ public static partial class Embeddings
             {
                 vector[i] += wordVector[i];
             }
-            
+
             // Track that we have added a new word.
             size++;
         }
@@ -213,7 +213,7 @@ public static partial class Embeddings
         {
             return vector;
         }
-        
+
         // Normalize the embeddings.
         for (ulong i = 0; i < _vectorSize; i++)
         {
@@ -222,7 +222,7 @@ public static partial class Embeddings
 
         return vector;
     }
-    
+
     /// <summary>
     /// Load a file into an existing collection.
     /// </summary>
@@ -257,13 +257,13 @@ public static partial class Embeddings
         {
             // Replace whitespaces with single spaces and lowercase everything, and then split the terms.
             string[] splits = RemoveWhitespace().Replace(s, " ").ToLower().Split('|');
-            
+
             // If there are no abbreviations, there is nothing to do.
             if (splits.Length < 2)
             {
                 continue;
             }
-            
+
             // Build all the abbreviations.
             SortedSet<string> abbreviations = [];
             for (int i = 1; i < splits.Length; i++)
@@ -273,7 +273,7 @@ public static partial class Embeddings
 
                 // Get a version of the string without any special characters.
                 string cleaned = AlphaNumerical().Replace(splits[i], string.Empty);
-                
+
                 // Add the cleaned version if it is different.
                 if (splits[i] != cleaned)
                 {
@@ -294,10 +294,10 @@ public static partial class Embeddings
     {
         // Ensure mappings are loaded.
         LoadMappings();
-        
+
         // Remove all non-alphanumeric characters (keeping parentheses), then make whitespace into single spaces and lowercase everything.
         s = RemoveWhitespace().Replace(AlphaNumericalBrackets().Replace(s, " "), " ").ToLower();
-        
+
         // Normalize the input string to FormD (decomposed form)
         s = s.Normalize(NormalizationForm.FormD);
 
@@ -307,10 +307,10 @@ public static partial class Embeddings
         {
             Builder.Append(c);
         }
-        
+
         // Rebuild the string and then split it into words.
         s = Builder.ToString().Normalize(NormalizationForm.FormC);
-        
+
         // Check all mappings.
         foreach (TermMappings mapping in Mappings)
         {
@@ -327,23 +327,23 @@ public static partial class Embeddings
                 s = Regex.Replace(s, $@"\b{k}\s*\({a}s\)", mapping.KeyTerm);
                 s = Regex.Replace(s, $@"\b{k}s\s*\({a}\)", mapping.KeyTerm);
                 s = Regex.Replace(s, $@"\b{k}s\s*\({a}s\)", mapping.KeyTerm);
-                
+
                 // Replace all other instances of the abbreviation with the key term.
                 s = Regex.Replace(s, $@"\b{a}\b", mapping.KeyTerm);
                 s = Regex.Replace(s, $@"\b{a}s\b", mapping.KeyTerm);
             }
         }
-        
+
         // We no longer want the parentheses as the terms have been cleaned.
         string[] terms = s.Replace('(', ' ').Replace(')', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries);
         Builder.Clear();
-        
+
         // Ensure stems are loaded.
         if (Stems.Count < 1)
         {
             LoadCollection(Stems, Values.GetFilePath(StemsFile));
         }
-        
+
         // Remove all stop words.
         foreach (string term in terms)
         {
@@ -372,16 +372,16 @@ public static partial class Embeddings
         {
             return;
         }
-        
+
         string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
-        
+
         // Get the directory that summaries could be in.
         string processedDirectory = $"{directory}{Processed}";
         if (!Directory.Exists(processedDirectory))
         {
             Directory.CreateDirectory(processedDirectory);
         }
-        
+
         // See how many documents already exist.
         HashSet<string> allFiles = [];
         foreach (string s in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
@@ -396,21 +396,28 @@ public static partial class Embeddings
 
             // The ID is the file name.
             string id = Path.GetFileNameWithoutExtension(files[i]);
+            string category = Path.GetFileName(Path.GetDirectoryName(files[i])) ?? "";
 
             // Check if we have already processed this file.
             if (allFiles.Contains(id))
             {
                 continue;
             }
-            
+
             // Read the current file.
             string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
 
+            // Write the processed to its file.
+            string category_path = Path.Combine(processedDirectory, $"{category}");
+            if (!Path.Exists(category_path)) // check if sub directory exists
+            {
+                Directory.CreateDirectory(category_path);
+            }
             await File.WriteAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
             allFiles.Add(id);
         }
     }
-    
+
     /// <summary>
     /// Perform indexing.
     /// </summary>
@@ -422,10 +429,10 @@ public static partial class Embeddings
         {
             return;
         }
-        
+
         // Ensure our vector mappings are loaded.
         LoadVectors();
-        
+
         // If we cannot delete the vector embeddings, assume we just have not made them yet.
         // If it was an error, our next creating line will catch it.
         try
@@ -436,7 +443,7 @@ public static partial class Embeddings
         {
             // Ignored.
         }
-        
+
         // Create our vector database.
         try
         {
@@ -447,7 +454,7 @@ public static partial class Embeddings
             Console.Error.WriteLine(e);
             return;
         }
-        
+
         // Get existing summaries.
         string summariesDirectory = $"{directory}{Values.Summaries}";
         HashSet<string> summaries = [];
@@ -458,7 +465,7 @@ public static partial class Embeddings
                 summaries.Add(Path.GetFileNameWithoutExtension(file));
             }
         }
-        
+
         // Get existing preprocessed contents.
         string processedDirectory = $"{directory}{Processed}";
         HashSet<string> processed = [];
@@ -469,7 +476,7 @@ public static partial class Embeddings
                 processed.Add(Path.GetFileNameWithoutExtension(file));
             }
         }
-        
+
         // Iterate over all files in our dataset.
         string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
         PointStruct[] points = new PointStruct[files.Length];
@@ -479,7 +486,7 @@ public static partial class Embeddings
 
             // The ID is the file name.
             string id = Path.GetFileNameWithoutExtension(files[i]);
-            
+
             // Read the current file.
             string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
 
@@ -492,10 +499,10 @@ public static partial class Embeddings
 
             points[i] = new()
             {
-                Id = (ulong) i,
+                Id = (ulong)i,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
                 Vectors = GetEmbeddings(processed.Contains(id) ? await File.ReadAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt")) : Preprocess($"{file[0]} {file[1]}")),
-                Payload = { 
+                Payload = {
                     [IdKey] = id,
                     [TitleKey] = file[0],
                     // Try and load the LLM summary if it exists.
@@ -505,7 +512,7 @@ public static partial class Embeddings
                 }
             };
         }
-        
+
         // Update our values into the vector database.
         UpdateResult updateResult = await VectorDatabase.UpsertAsync(VectorCollectionName, points);
         if (updateResult.Status != UpdateStatus.Completed)
@@ -526,23 +533,23 @@ public static partial class Embeddings
     public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts)
     {
         QueryResult result = new();
-        
+
         // Ensure our vector embeddings are loaded.
         LoadVectors();
-        
+
         Query query;
-        
+
         // If we are looking for similar documents, query by the ID.
         if (id != null)
         {
             query = ulong.Parse(id);
         }
-        
+
         // Otherwise, compute based on the query string.
         else
         {
             float[] vectors = GetEmbeddings(Preprocess(queryString ?? string.Empty), out int size);
-            
+
             // If there was no matching vectors and the query string was not empty, attempt spelling correction.
             if (size < 1 && !string.IsNullOrWhiteSpace(queryString))
             {
@@ -555,7 +562,7 @@ public static partial class Embeddings
                 await using FileStream dictionaryStream = File.OpenRead(DictionaryFile);
                 await using FileStream affixStream = File.OpenRead(AffinityFile);
                 WordList dictionary = await WordList.CreateFromStreamsAsync(dictionaryStream, affixStream);
-                
+
                 // How many times we should attempt spell checking.
                 for (int i = 0; i < attempts; i++)
                 {
@@ -568,7 +575,7 @@ public static partial class Embeddings
                         {
                             continue;
                         }
-                        
+
                         // Get suggestions, using the first if there is one.
                         string[] suggestions = dictionary.Suggest(words[j]).ToArray();
                         if (suggestions is { Length: > 0 })
@@ -580,7 +587,7 @@ public static partial class Embeddings
 
                     // Built the corrected string.
                     string correctedQuery = Preprocess(string.Join(" ", words));
-                    
+
                     // If the strings are equal, there is nothing else to change.
                     if (queryString == correctedQuery)
                     {
@@ -591,7 +598,7 @@ public static partial class Embeddings
                     queryString = correctedQuery;
                     result.CorrectedQuery = queryString;
                     vectors = GetEmbeddings(Preprocess(queryString), out size);
-                    
+
                     // If there was at least one matching vector, we are ready to query..
                     if (size > 0)
                     {
@@ -603,7 +610,7 @@ public static partial class Embeddings
             // Assign the vectors to the query.
             query = vectors;
         }
-        
+
         if (start < 0)
         {
             start = 0;
@@ -655,21 +662,21 @@ public static partial class Embeddings
     /// <returns>The regex to remove whitespace</returns>
     [GeneratedRegex(@"\s+")]
     private static partial Regex RemoveWhitespace();
-    
+
     /// <summary>
     /// Get only the alphanumerical characters.
     /// </summary>
     /// <returns>Only the alphanumerical characters.</returns>
     [GeneratedRegex("[^a-zA-Z0-9]")]
     private static partial Regex AlphaNumerical();
-    
+
     /// <summary>
     /// Get only the alphanumerical characters of at least length one.
     /// </summary>
     /// <returns>Only the alphanumerical characters.</returns>
     [GeneratedRegex("[^a-zA-Z0-9]+")]
     private static partial Regex AlphaNumericalPlus();
-    
+
     /// <summary>
     /// Get only the alphanumerical characters and brackets.
     /// </summary>

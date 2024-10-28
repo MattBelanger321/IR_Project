@@ -10,7 +10,7 @@ namespace Builder;
 public static class Ollama
 {
     private const string Prompt = "Summarize the following article in one sentence:\n";
-    
+
     /// <summary>
     /// The default Ollama endpoint.
     /// </summary>
@@ -20,9 +20,9 @@ public static class Ollama
     /// The model to use for summarizing.
     /// </summary>
     private const string Model = "llama3.2";
-    
+
     private static readonly HttpClient Client = new();
-    
+
     /// <summary>
     /// Summarize the articles.
     /// </summary>
@@ -34,20 +34,20 @@ public static class Ollama
         {
             name = Model
         }));
-        
+
         // If it failed to pull, do not continue.
         if (response == null)
         {
             return false;
         }
-        
+
         // If there are no raw files, there is nothing to summarize.
         string rawDirectory = Values.GetDataset;
         if (!Path.Exists(rawDirectory))
         {
             return false;
         }
-        
+
         // Get all files raw files.
         string[] files = Directory.GetFiles(rawDirectory, "*.*", SearchOption.AllDirectories);
 
@@ -57,14 +57,14 @@ public static class Ollama
         {
             Directory.CreateDirectory(summariesDirectory);
         }
-        
+
         // Get the names of all existing files.
         HashSet<string> existing = [];
         foreach (string s in Directory.GetFiles(summariesDirectory, "*.*", SearchOption.AllDirectories))
         {
             existing.Add(Path.GetFileNameWithoutExtension(s));
         }
-        
+
         // URL for generating messages.
         const string url = $"{Url}generate";
 
@@ -72,19 +72,20 @@ public static class Ollama
         for (int i = 0; i < files.Length; i++)
         {
             Console.WriteLine($"Summarizing file {i + 1} of {files.Length}");
-            
+
             // The ID is the file name.
             string id = Path.GetFileNameWithoutExtension(files[i]);
+            string category = Path.GetFileName(Path.GetDirectoryName(files[i])) ?? "";
 
             // If this file already exists, skip indexing it.
             if (existing.Contains(id))
             {
                 continue;
             }
-            
+
             // Read the file.
             string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
-            
+
             // Request the summary.
             response = await GetResponse(url, JsonSerializer.Serialize(new
             {
@@ -98,7 +99,7 @@ public static class Ollama
             {
                 return false;
             }
-            
+
             // Parse the JSON and get the "response" field, stopping if it fails.
             if (!JsonDocument.Parse(response).RootElement.TryGetProperty("response", out JsonElement element))
             {
@@ -111,9 +112,14 @@ public static class Ollama
             {
                 return false;
             }
-            
+
             // Write the summary to its file.
-            await File.WriteAllTextAsync(Path.Combine(summariesDirectory, $"{id}.txt"),  ArXiv.CleanString(response));
+            string category_path = Path.Combine(summariesDirectory, $"{category}");
+            if (!Path.Exists(category_path)) // check if sub directory exists
+            {
+                Directory.CreateDirectory(category_path);
+            }
+            await File.WriteAllTextAsync(Path.Combine(category_path, $"{id}.txt"), ArXiv.CleanString(response));
             existing.Add(id);
         }
 
