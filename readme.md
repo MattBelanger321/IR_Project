@@ -34,6 +34,12 @@
 4. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
 5. Run ``Indexer``.
 
+### Optional
+
+- To generate plots, you can run the following two files with the following arguments.
+1. ``plot_embedding.py [-h] --method {pca,tsne} [--output OUTPUT] [--category CATEGORY] [--perplexity PERPLEXITY]``
+2. ``text_statistics.py [-h] directory output``
+
 ## Serving
 
 1. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
