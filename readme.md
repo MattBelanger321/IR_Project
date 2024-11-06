@@ -30,7 +30,7 @@
 - Follow these steps if you want to build your [arXiv](https://arxiv.org "arXiv") dataset for the first time.
 1. Ensure [Ollama](https://ollama.com "Ollama") is running.
 2. Run ``Builder``.
-3. Run ``word2vec.py``.
+3. Run ``word2vec.py``. **From the ``embeddings`` folder, copy over an embeddings file to the root of your application.** This will be the embeddings used at runtime. It is recommended you use the ``embeddings.txt`` file directly under ``embeddings`` rather than the category specific ones for the best results.
 4. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
 5. Run ``Indexer``.
 
