@@ -408,10 +408,10 @@ public static partial class Embeddings
             string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
 
             // Write the processed to its file.
-            string category_path = Path.Combine(processedDirectory, $"{category}");
-            if (!Path.Exists(category_path)) // check if sub directory exists
+            string categoryPath = Path.Combine(processedDirectory, $"{category}");
+            if (!Path.Exists(categoryPath))
             {
-                Directory.CreateDirectory(category_path);
+                Directory.CreateDirectory(categoryPath);
             }
             await File.WriteAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
             allFiles.Add(id);
@@ -457,23 +457,23 @@ public static partial class Embeddings
 
         // Get existing summaries.
         string summariesDirectory = $"{directory}{Values.Summaries}";
-        HashSet<string> summaries = [];
+        Dictionary<string, string> summaries = [];
         if (Directory.Exists(summariesDirectory))
         {
             foreach (string file in Directory.GetFiles(summariesDirectory, "*.*", SearchOption.AllDirectories))
             {
-                summaries.Add(Path.GetFileNameWithoutExtension(file));
+                summaries.Add(Path.GetFileNameWithoutExtension(file), file);
             }
         }
 
         // Get existing preprocessed contents.
         string processedDirectory = $"{directory}{Processed}";
-        HashSet<string> processed = [];
+        Dictionary<string, string> processed = [];
         if (Directory.Exists(processedDirectory))
         {
             foreach (string file in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
             {
-                processed.Add(Path.GetFileNameWithoutExtension(file));
+                processed.Add(Path.GetFileNameWithoutExtension(file), file);
             }
         }
 
@@ -501,12 +501,12 @@ public static partial class Embeddings
             {
                 Id = (ulong)i,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
-                Vectors = GetEmbeddings(processed.Contains(id) ? await File.ReadAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt")) : Preprocess($"{file[0]} {file[1]}")),
+                Vectors = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}")),
                 Payload = {
                     [IdKey] = id,
                     [TitleKey] = file[0],
                     // Try and load the LLM summary if it exists.
-                    [SummaryKey] = summaries.Contains(id)? await File.ReadAllTextAsync(Path.Combine(summariesDirectory, $"{id}.txt")) : file[1],
+                    [SummaryKey] = summaries.TryGetValue(id, out string? s) ? await File.ReadAllTextAsync(s) : file[1],
                     [UpdatedKey] = file[2],
                     [AuthorsKey] = authors
                 }
@@ -586,7 +586,8 @@ public static partial class Embeddings
                     }
 
                     // Built the corrected string.
-                    string correctedQuery = Preprocess(string.Join(" ", words));
+                    string raw = string.Join(" ", words);
+                    string correctedQuery = Preprocess(raw);
 
                     // If the strings are equal, there is nothing else to change.
                     if (queryString == correctedQuery)
@@ -596,7 +597,7 @@ public static partial class Embeddings
 
                     // Otherwise, see if there is any improvements with the vector embeddings.
                     queryString = correctedQuery;
-                    result.CorrectedQuery = queryString;
+                    result.CorrectedQuery = raw;
                     vectors = GetEmbeddings(Preprocess(queryString), out size);
 
                     // If there was at least one matching vector, we are ready to query..
