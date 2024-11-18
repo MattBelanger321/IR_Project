@@ -1,9 +1,12 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using iText.Kernel.Pdf;
+using iText.Kernel.Pdf.Canvas.Parser;
 using Markdig;
 using SearchEngine.Shared;
 
-namespace Builder;
+namespace SearchEngine.Server;
 
 /// <summary>
 /// Handle everything related to arXiv.
@@ -34,16 +37,6 @@ public static partial class ArXiv
     /// The default total number of results we want for our own database.
     /// </summary>
     private const int TotalResults = 5000;
-
-    /// <summary>
-    /// All arXiv computer science categories.
-    /// </summary>
-    private static readonly string[] Categories = [
-        "cs.AI", "cs.AR", "cs.CC", "cs.CE", "cs.CG", "cs.CL", "cs.CR", "cs.CV", "cs.CY", "cs.DB", "cs.DC", "cs.DL",
-        "cs.DM", "cs.DS", "cs.ET", "cs.FL", "cs.GL", "cs.GR", "cs.GT", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.LO",
-        "cs.MA", "cs.MM", "cs.MS", "cs.NA", "cs.NE", "cs.NI", "cs.OH", "cs.OS", "cs.PF", "cs.PL", "cs.RO", "cs.SC",
-        "cs.SD", "cs.SE", "cs.SI", "cs.SY"
-    ];
     
     /// <summary>
     /// Regex method to remove all whitespace.
@@ -99,7 +92,8 @@ public static partial class ArXiv
     /// <param name="sortOrder">The sorting order - descending ascending.</param>
     /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="totalResults">The total number of results we want for our own database.</param>
-    public static async Task SaveDocumentsGetLinksAsync(string sortBy = SortBy, string sortOrder = SortOrder, int maxResults = MaxResults, int totalResults = TotalResults)
+    /// <param name="primaryCategory">The primary category to start searches from.</param>
+    public static async Task SaveDocumentsGetLinksAsync(string sortBy = SortBy, string sortOrder = SortOrder, int maxResults = MaxResults, int totalResults = TotalResults, string primaryCategory = "cs.AI")
     {
         // Ensure valid values.
         if (totalResults < 1)
@@ -121,69 +115,74 @@ public static partial class ArXiv
             Directory.CreateDirectory(directoryPath);
         }
 
-        // See how many documents already exist across all areas.
+        // See how many documents already exist across all categories.
         HashSet<string> allFiles = [];
         foreach (string s in Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories))
         {
             allFiles.Add(Path.GetFileNameWithoutExtension(s));
         }
 
-        // Get papers for all categories.
-        for (int i = 0; i < Categories.Length; i++)
+        // Determine how many files we need to still save.
+        totalResults -= allFiles.Count;
+        
+        // Query until we have enough documents for this category.
+        int startIndex = 0;
+        while (totalResults > 0)
         {
-            // Ensure the folder for this category exists.
-            string categoryPath = Path.Combine(directoryPath, Categories[i]);
-            if (!Directory.Exists(categoryPath))
+            // Search for more documents.
+            List<SearchDocument>? documents = await GetLinksAsync(primaryCategory, sortBy, sortOrder, maxResults, startIndex, allFiles);
+
+            // If null was returned, it means no documents were returned by the search.
+            if (documents == null)
             {
-                Directory.CreateDirectory(categoryPath);
+                Console.WriteLine("No results; either no more or rate limited.");
+                break;
             }
             
-            // Get how many files are saved under this category.
-            int categoryTotalResults = totalResults - Directory.GetFiles(categoryPath, "*.*", SearchOption.AllDirectories).Length;
-            Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | {categoryTotalResults} Remaining");
-            
-            // Query until we have enough documents for this category.
-            int startIndex = 0;
-            while (categoryTotalResults > 0)
+            // Try every document.
+            foreach (SearchDocument document in documents)
             {
-                // Search for more documents.
-                List<SearchDocument>? documents = await GetLinksAsync(Categories[i], sortBy, sortOrder, maxResults, startIndex, allFiles);
-
-                // If null was returned, it means no documents were returned by the search.
-                if (documents == null)
+                // If the file already exists in any category, there is no need to write it again.
+                if (document.ArXivId == null || document.Title == null || document.Summary == null || document.Authors == null || document.Updated == null || document.Categories == null || document.Linked == null || allFiles.Contains(document.ArXivId))
                 {
-                    Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | No results; either no more or rate limited.");
-                    break;
+                    continue;
+                }
+
+                // If there was no category, use this one.
+                if (document.Categories.Length < 1)
+                {
+                    document.Categories = [primaryCategory];
+                }
+
+                // Format the categories and authors.
+                string categories = string.Join("|", document.Categories);
+                string authors = string.Join("|", document.Authors);
+                string links = string.Join("|", document.Linked);
+
+                // Build the new file.
+                string contents = $"{document.Title}\n{document.Summary}\n{document.Updated.Value.Year}-{document.Updated.Value.Month}-{document.Updated.Value.Day} {document.Updated.Value.Hour}:{document.Updated.Value.Minute}:{document.Updated.Value.Second}\n{authors}\n{categories}\n{links}";
+                
+                // Save to the primary path.
+                string instancePath = Path.Combine(directoryPath, document.Categories[0]);
+                if (!Directory.Exists(instancePath))
+                {
+                    Directory.CreateDirectory(instancePath);
                 }
                 
-                // Try every document.
-                foreach (SearchDocument document in documents)
+                // Write to the new file.
+                await File.WriteAllTextAsync(Path.Combine(instancePath, $"{document.ArXivId}.txt"), contents);
+                allFiles.Add(document.ArXivId);
+
+                // If we have enough documents, stop.
+                Console.WriteLine($"{--totalResults} Remaining");
+                if (totalResults <= 0)
                 {
-                    // If the file already exists in any category, there is no need to write it again.
-                    if (document.ArXivId == null || document.Title == null || document.Summary == null || document.Authors == null || document.Updated == null || allFiles.Contains(document.ArXivId))
-                    {
-                        continue;
-                    }
-
-                    // Build the new file.
-                    string contents = $"{document.Title}\n{document.Summary}\n{document.Updated.Value.Year}-{document.Updated.Value.Month}-{document.Updated.Value.Day} {document.Updated.Value.Hour}:{document.Updated.Value.Minute}:{document.Updated.Value.Second}";
-                    contents = document.Authors.Aggregate(contents, (current, author) => current + $"\n{author}");
-
-                    // Write to the new file.
-                    await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{document.ArXivId}.txt"), contents);
-                    allFiles.Add(document.ArXivId);
-
-                    // If we have enough documents, stop.
-                    Console.WriteLine($"Category {i + 1} of {Categories.Length} | {Categories[i]} | {--categoryTotalResults} Remaining");
-                    if (categoryTotalResults <= 0)
-                    {
-                        break;
-                    }
+                    break;
                 }
-
-                // For the next query, index the next possible documents.
-                startIndex += maxResults;
             }
+
+            // For the next query, index the next possible documents.
+            startIndex += maxResults;
         }
     }
     
@@ -229,6 +228,8 @@ public static partial class ArXiv
             return null;
         }
 
+        string root = Values.GetRootDirectory() ?? string.Empty;
+
         // Save our documents.
         List<SearchDocument> documents = [];
         foreach (XElement entry in returned)
@@ -269,6 +270,48 @@ public static partial class ArXiv
                 continue;
             }
             
+            string pdf = Path.Combine(root, "currently_indexing.pdf");
+            string[] links;
+
+            try
+            {
+                // Download the PDF to a temporary file.
+                using HttpClient client = new();
+                byte[] bytes = await client.GetByteArrayAsync($"https://arxiv.org/pdf/{id}");
+                await File.WriteAllBytesAsync(pdf, bytes);
+
+                // Open the PDF document to get the text.
+                using (PdfReader pdfReader = new(pdf))
+                {
+                    using (PdfDocument pdfDocument = new(pdfReader))
+                    {
+                        StringBuilder sb = new();
+                        for (int page = 1; page <= pdfDocument.GetNumberOfPages(); page++)
+                        {
+                            sb.Append(PdfTextExtractor.GetTextFromPage(pdfDocument.GetPage(page)));
+                        }
+                
+                        // Extract the links from the PDF.
+                        links = GetLinks(sb.ToString(), id);
+                    }
+                }
+                
+                File.Delete(pdf);
+            }
+            catch (Exception e)
+            {
+                await Console.Error.WriteLineAsync($"An error occurred getting the PDF: {e.Message}");
+                links = [];
+                try
+                {
+                    File.Delete(pdf);
+                }
+                catch
+                {
+                    // Ignored as this must not yet exist.
+                }
+            }
+            
             // Add the document.
             documents.Add(new()
             {
@@ -276,7 +319,9 @@ public static partial class ArXiv
                 Title = title,
                 Summary = summary,
                 Authors = GetAuthors(entry),
-                Updated = updated
+                Updated = updated,
+                Categories = GetCategories(entry),
+                Linked = links
             });
         }
         
@@ -290,10 +335,37 @@ public static partial class ArXiv
     /// <returns>The authors as a list.</returns>
     private static string[] GetAuthors(XElement entry)
     {
-        return entry
-            .Elements($"{XmlCore}author")
-            .Select(author => CleanString(author.Element($"{XmlCore}name")?.Value ?? string.Empty))
-            .ToArray();
+        return entry.Elements($"{XmlCore}author").Select(author => CleanString(author.Element($"{XmlCore}name")?.Value ?? string.Empty)).ToArray();
+    }
+
+    /// <summary>
+    /// Get the categories this is in.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <returns></returns>
+    private static string[] GetCategories(XElement entry)
+    {
+        // Store all categories.
+        List<string> categories = [];
+
+        // Get all categories.
+        foreach (XElement element in entry.Elements($"{XmlCore}category"))
+        {
+            XAttribute? term = element.Attribute("term");
+            if (term == null)
+            {
+                continue;
+            }
+
+            // If this category has not yet been added, add it.
+            string category = CleanString(term.Value);
+            if (!categories.Contains(category))
+            {
+                categories.Add(category);
+            }
+        }
+        
+        return categories.ToArray();
     }
 
     /// <summary>
@@ -340,6 +412,46 @@ public static partial class ArXiv
     }
 
     /// <summary>
+    /// Get all potential links for a file.
+    /// </summary>
+    /// <param name="text">The text to extract links to other files from.</param>
+    /// <param name="id">The ID of the file as we should not link to ourselves.</param>
+    /// <returns></returns>
+    private static string[] GetLinks(string text, string id)
+    {
+        // All possible starting configurations.
+        string[] starts = ["arXiv:", "arxiv.org/abs/", "https://arxiv.org/abs/"];
+
+        // Build all links.
+        HashSet<string> links = [];
+        foreach (string split in text.Split())
+        {
+            // Check if the current split is of the form for arXiv files.
+            foreach (string start in starts)
+            {
+                if (!split.StartsWith(start))
+                {
+                    continue;
+                }
+
+                // Parse out the link.
+                string link = split.Replace(start, string.Empty).TrimEnd('.');
+                
+                // Remove a version ending as some arXiv links have.
+                link = VersionRemover().Replace(link, "");
+                
+                // If this is not our document add it.
+                if (link != id)
+                {
+                    links.Add(link);
+                }
+            }
+        }
+
+        return links.OrderBy(x => x).ToArray();
+    }
+
+    /// <summary>
     /// Get an element from the XML.
     /// </summary>
     /// <param name="entry">The XML entry.</param>
@@ -373,6 +485,11 @@ public static partial class ArXiv
         s = RemoveMath().Replace(s, "$1");
         // Try to remove commands.
         s = RemoveCommands().Replace(s, "$1");
+        // Convert LaTeX quotes to regular ones.
+        s = s.Replace("``", "\"");
+        s = s.Replace("''", "\"");
+        // Convert LaTeX "--" into just "-".
+        s = s.Replace("--", "-");
         // Try to remove any leftover braces.
         return RemoveExtraBraces().Replace(s, "").Trim();
     }

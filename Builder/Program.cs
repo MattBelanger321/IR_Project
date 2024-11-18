@@ -1,11 +1,4 @@
-﻿using Builder;
-using SearchEngine.Server;
+﻿using SearchEngine.Server;
 
-// Get all the documents to build our dataset.
-await ArXiv.SaveDocumentsGetLinksAsync();
-
-// Summarize documents.
-await Ollama.Summarize();
-
-// Process all documents.
-await Embeddings.Preprocess();
+// Get all the documents to build our dataset, creating a fresh database for them.
+await ScrappingService.Scrape(10, 10, true);

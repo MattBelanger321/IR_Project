@@ -29,10 +29,10 @@
 
 - Follow these steps if you want to build your [arXiv](https://arxiv.org "arXiv") dataset for the first time.
 1. Ensure [Ollama](https://ollama.com "Ollama") is running.
-2. Run ``Builder``.
+2. Run ``Builder`` which will fail eventually if there is no ``embeddings.txt`` file which is what the next step is for.
 3. Run ``word2vec.py``. **From the ``embeddings`` folder, copy over an embeddings file to the root of your application.** This will be the embeddings used at runtime. It is recommended you use the ``embeddings.txt`` file directly under ``embeddings`` rather than the category specific ones for the best results.
 4. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
-5. Run ``Indexer``.
+5. Run ``Builder`` again.
 
 ### Optional
 
@@ -49,16 +49,13 @@
 
 ## Builder - C#
 
-This will handle building the dataset from [arXiv](https://arxiv.org "arXiv") and summarizing it with [Ollama](https://ollama.com "Ollama").
-
-## Indexer - C#
-
-- This will index the data into [Qdrant](https://github.com/qdrant/qdrant "Qdrant").
+This will handle one-time building and indexing of the dataset from [arXiv](https://arxiv.org "arXiv"), summarizing it with [Ollama](https://ollama.com "Ollama"), and indexing it into [Qdrant](https://github.com/qdrant/qdrant "Qdrant").
 
 ## Server - C#
 
 - Hosts the backend server so we can run searches from our client.
 - This also contains all [Qdrant](https://github.com/qdrant/qdrant "Qdrant") methods for indexing and searching.
+- Will automatically scrape and index more [arXiv](https://arxiv.org "arXiv") data.
 
 ## Client - C#
 
@@ -84,7 +81,9 @@ This will handle building the dataset from [arXiv](https://arxiv.org "arXiv") an
 - The first line of a text file contains the title of the document.
 - The second line contains the abstract.
 - The third line has the date and time in the format of "YYYY-DD-MM hh:mm:ss".
-- The fourth line and beyond lines each contain an author name, depending on how many authors there are for a given paper.
+- The fourth line has all authors separated by a "|".
+- The fifth line has all categories separated by a "|", with the primary category being the first one.
+- The sixth link has the IDs of all [arXiv](https://arxiv.org "arXiv") documents which this document links to.
 - All text has been preprocessed, ensuring all whitespace has been replaced by single spaces. Additionally, LaTeX/Markdown has been converted over to plain text.
 
 # Key Terms and Abbreviations

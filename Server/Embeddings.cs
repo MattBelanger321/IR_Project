@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using iText.Layout.Element;
 using Porter2Stemmer;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
@@ -413,7 +414,8 @@ public static partial class Embeddings
             {
                 Directory.CreateDirectory(categoryPath);
             }
-            await File.WriteAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
+            
+            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
             allFiles.Add(id);
         }
     }
@@ -421,7 +423,9 @@ public static partial class Embeddings
     /// <summary>
     /// Perform indexing.
     /// </summary>
-    public static async Task Index()
+    /// <param name="reset">If we want to reset the vector database or not.</param>
+    /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
+    public static async Task Index(bool reset = false, double similarityThreshold = 1)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -433,15 +437,19 @@ public static partial class Embeddings
         // Ensure our vector mappings are loaded.
         LoadVectors();
 
-        // If we cannot delete the vector embeddings, assume we just have not made them yet.
-        // If it was an error, our next creating line will catch it.
-        try
+        // Try and delete the vector database for a complete reset if we should.
+        if (reset)
         {
-            await VectorDatabase.DeleteCollectionAsync(VectorCollectionName);
-        }
-        catch
-        {
-            // Ignored.
+            // If we cannot delete the vector embeddings, assume we just have not made them yet.
+            // If it was an error, our next creating line will catch it.
+            try
+            {
+                await VectorDatabase.DeleteCollectionAsync(VectorCollectionName);
+            }
+            catch
+            {
+                // Ignored.
+            }
         }
 
         // Create our vector database.
@@ -449,10 +457,9 @@ public static partial class Embeddings
         {
             await VectorDatabase.CreateCollectionAsync(VectorCollectionName, new VectorParams { Size = _vectorSize, Distance = Distance.Cosine });
         }
-        catch (Exception e)
+        catch
         {
-            Console.Error.WriteLine(e);
-            return;
+            // Ignored as it may already exist.
         }
 
         // Get existing summaries.
@@ -479,7 +486,8 @@ public static partial class Embeddings
 
         // Iterate over all files in our dataset.
         string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
-        PointStruct[] points = new PointStruct[files.Length];
+        List<PointStruct> points = [];
+        int index = 0;
         for (int i = 0; i < files.Length; i++)
         {
             Console.WriteLine($"Indexing file {i + 1} of {files.Length}");
@@ -490,29 +498,59 @@ public static partial class Embeddings
             // Read the current file.
             string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
 
-            // Index the authors formatted nicely.
-            string authors = file.Length > 3 ? file[3] : string.Empty;
-            for (int j = 4; j < file.Length; j++)
+            // See if we have already preprocessed the contents. Otherwise, preprocess it now.
+            float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}"));
+
+            try
             {
-                authors += $"|{file[j]}";
+                // See if there is a similar file.
+                IReadOnlyList<ScoredPoint> existing = await VectorDatabase.QueryAsync(VectorCollectionName, new(embeddings), limit: 1);
+
+                if (existing.Count > 0)
+                {
+                    // If it is the same file, no reason to index it again.
+                    if (existing[0].Payload[IdKey].StringValue == id)
+                    {
+                        continue;
+                    }
+
+                    // If the document is similar enough, skip it.
+                    if (existing[0].Score >= similarityThreshold)
+                    {
+                        continue;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                await Console.Error.WriteLineAsync($"Search for existing document failed: {e}");
+                break;
             }
 
-            points[i] = new()
+            points.Add(new()
             {
-                Id = (ulong)i,
+                Id = (ulong)index,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
-                Vectors = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}")),
+                Vectors = GetEmbeddings(processed.TryGetValue(id, out string? q) ? await File.ReadAllTextAsync(q) : Preprocess($"{file[0]} {file[1]}")),
                 Payload = {
                     [IdKey] = id,
                     [TitleKey] = file[0],
                     // Try and load the LLM summary if it exists.
                     [SummaryKey] = summaries.TryGetValue(id, out string? s) ? await File.ReadAllTextAsync(s) : file[1],
                     [UpdatedKey] = file[2],
-                    [AuthorsKey] = authors
+                    [AuthorsKey] = file[3]
                 }
-            };
+            });
+            
+            index++;
         }
 
+        // Nothing to do if no changes.
+        if (points.Count < 1)
+        {
+            return;
+        }
+        
         // Update our values into the vector database.
         UpdateResult updateResult = await VectorDatabase.UpsertAsync(VectorCollectionName, points);
         if (updateResult.Status != UpdateStatus.Completed)

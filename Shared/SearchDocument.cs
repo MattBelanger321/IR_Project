@@ -34,6 +34,16 @@ public class SearchDocument
     /// The date and time this document was updated.
     /// </summary>
     public DateTime? Updated { get; set; }
+    
+    /// <summary>
+    /// The categories of the documents.
+    /// </summary>
+    public string[]? Categories { get; set; }
+    
+    /// <summary>
+    /// Other documents which link to this document.
+    /// </summary>
+    public string[]? Linked { get; set; }
 
     /// <summary>
     /// Write this to a standardized format.

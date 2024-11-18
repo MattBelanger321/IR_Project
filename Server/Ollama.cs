@@ -2,7 +2,7 @@
 using System.Text.Json;
 using SearchEngine.Shared;
 
-namespace Builder;
+namespace SearchEngine.Server;
 
 /// <summary>
 /// Handle interacting with Ollama.
@@ -19,8 +19,11 @@ public static class Ollama
     /// <summary>
     /// The model to use for summarizing.
     /// </summary>
-    private const string Model = "llama3.2";
+    private const string Model = "llama3.2:1b";
 
+    /// <summary>
+    /// The client.
+    /// </summary>
     private static readonly HttpClient Client = new();
 
     /// <summary>
@@ -114,12 +117,12 @@ public static class Ollama
             }
 
             // Write the summary to its file.
-            string category_path = Path.Combine(summariesDirectory, $"{category}");
-            if (!Path.Exists(category_path)) // check if sub directory exists
+            string categoryPath = Path.Combine(summariesDirectory, $"{category}");
+            if (!Path.Exists(categoryPath))
             {
-                Directory.CreateDirectory(category_path);
+                Directory.CreateDirectory(categoryPath);
             }
-            await File.WriteAllTextAsync(Path.Combine(category_path, $"{id}.txt"), ArXiv.CleanString(response));
+            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), SearchEngine.Server.ArXiv.CleanString(response));
             existing.Add(id);
         }
 
