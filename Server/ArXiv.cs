@@ -1,8 +1,7 @@
-﻿using System.Text;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using iText.Kernel.Pdf;
-using iText.Kernel.Pdf.Canvas.Parser;
 using Markdig;
 using SearchEngine.Shared;
 
@@ -36,7 +35,7 @@ public static partial class ArXiv
     /// <summary>
     /// The default maximum number of results to get from arXiv at once.
     /// </summary>
-    private const int MaxResults = 1000;
+    private const int MaxResults = 2000;
 
     /// <summary>
     /// The default total number of results we want for our own database.
@@ -96,13 +95,6 @@ public static partial class ArXiv
     private static partial Regex OnlyNumbers();
 
     /// <summary>
-    /// Regex for numerical values only.
-    /// </summary>
-    /// <returns>The string with numeric values only.</returns>
-    [GeneratedRegex("[^0-9.]")]
-    private static partial Regex NumericOnlyRegex();
-
-    /// <summary>
     /// Regex to check if something is a valid arXiv ID.
     /// </summary>
     /// <returns>If this is a valid ID.</returns>
@@ -146,7 +138,7 @@ public static partial class ArXiv
         // See how many documents already exist across all categories.
         HashSet<string> saved = [];
         HashSet<string> paths = [];
-        foreach (string s in Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories))
+        foreach (string s in Directory.GetFiles(directoryPath, "*.txt", SearchOption.AllDirectories))
         {
             saved.Add(Path.GetFileNameWithoutExtension(s));
             paths.Add(s);
@@ -166,9 +158,16 @@ public static partial class ArXiv
             }
         }
 
+        Console.WriteLine($"Existing files contain {remaining.Count} references to be searched.");
         while (await GetReferences(directoryPath, saved, remaining))
         {
-            Console.WriteLine($"{remaining.Count} references remaining.");
+            Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents | {remaining.Count} new references.");
+        }
+
+        if (saved.Count >= totalResults)
+        {
+            Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents | Not downloading new documents.");
+            return;
         }
 
         string[] options = new string[Categories.Length];
@@ -189,7 +188,7 @@ public static partial class ArXiv
             if (documents == null)
             {
                 Console.WriteLine("No results; either no more or rate limited.");
-                break;
+                return;
             }
             
             // Try every document.
@@ -221,7 +220,7 @@ public static partial class ArXiv
                 saved.Add(document.ArXivId);
 
                 // If we have enough documents, stop.
-                Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents.");
+                Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents | {document.ArXivId} | {document.Linked.Length} references");
 
                 // We must get any linked documents.
                 foreach (string id in document.Linked)
@@ -229,21 +228,68 @@ public static partial class ArXiv
                     remaining.Add(id);
                 }
                 
-                Console.WriteLine($"Start = {remaining.Count}");
                 while (await GetReferences(directoryPath, saved, remaining))
                 {
-                    Console.WriteLine($"Outside = {remaining.Count}");
+                    Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents | {remaining.Count} new references.");
                 }
 
                 // If at any point we have enough; stop.
-                if (saved.Count >= totalResults)
+                if (saved.Count < totalResults)
                 {
-                    return;
+                    continue;
                 }
+
+                Console.WriteLine($"Downloaded {saved.Count} of {totalResults} documents | Stopping.");
+                return;
             }
 
             // For the next query, index the next possible documents.
             startIndex += maxResults;
+        }
+    }
+
+    /// <summary>
+    /// Get citations for a paper.
+    /// </summary>
+    /// <param name="id">The ID of the paper.</param>
+    /// <returns>The IDs of any other arXiv papers it was found this references.</returns>
+    public static async Task<string[]?> QueryCitations(string id)
+    {
+        try
+        {
+            // Request references.
+            HttpResponseMessage response = await new HttpClient().GetAsync($"https://opencitations.net/index/coci/api/v1/citations/10.48550/arXiv.{id}");
+            
+            // Parse the JSON response.
+            List<OpenCitation>? references = JsonSerializer.Deserialize<List<OpenCitation>>(await response.Content.ReadAsStringAsync());
+            if (references == null)
+            {
+                Console.WriteLine("No results getting references; potentially rate limited.");
+                return null;
+            }
+
+            // Extract arXiv DOIs and convert them back to arXiv IDs.
+            List<string> cites = [];
+            foreach (OpenCitation reference in references)
+            {
+                if (!reference.Citing.Contains("10.48550/arXiv."))
+                {
+                    continue;
+                }
+
+                string cite = reference.Citing.Replace("10.48550/arXiv.", string.Empty);
+                if (IsValidId().IsMatch(cite))
+                {
+                    cites.Add(cite);
+                }
+            }
+
+            return cites.ToArray();
+        }
+        catch (Exception e)
+        {
+            await Console.Error.WriteLineAsync($"{id} - An error occurred getting the references - {e.Message}");
+            return null;
         }
     }
 
@@ -254,7 +300,7 @@ public static partial class ArXiv
     /// <param name="saved">The documents which have been saved already.</param>
     /// <param name="remaining">Remaining items.</param>
     /// <returns>True if anything was added, false otherwise</returns>
-    public static async Task<bool> GetReferences(string directoryPath, HashSet<string> saved, HashSet<string> remaining)
+    private static async Task<bool> GetReferences(string directoryPath, HashSet<string> saved, HashSet<string> remaining)
     {
         int index = 0;
         HashSet<string> done = [];
@@ -319,8 +365,6 @@ public static partial class ArXiv
         {
             remaining.Add(id);
         }
-        
-        Console.WriteLine($"Inside = {remaining.Count}");
 
         // If any new items were found, there is more to collect.
         return found.Count > 0;
@@ -333,7 +377,6 @@ public static partial class ArXiv
     /// <returns>The URL to search for a specific document.</returns>
     private static string GetSpecificDocument(string id)
     {
-        Console.WriteLine($"{QueryBase}id_list={id}");
         return $"{QueryBase}id_list={id}";
     }
 
@@ -367,7 +410,7 @@ public static partial class ArXiv
     /// </summary>
     /// <param name="url">The URL to search with.</param>
     /// <param name="existing">The existing files.</param>
-    public static async Task<List<SearchDocument>?> GetDocumentsAsync(string url, ICollection<string>? existing = null)
+    private static async Task<List<SearchDocument>?> GetDocumentsAsync(string url, ICollection<string>? existing = null)
     {
         existing ??= new SortedSet<string>();
 
@@ -388,8 +431,6 @@ public static partial class ArXiv
         {
             return null;
         }
-
-        string root = Values.GetRootDirectory() ?? string.Empty;
 
         // Save our documents.
         List<SearchDocument> documents = [];
@@ -431,46 +472,9 @@ public static partial class ArXiv
                 continue;
             }
             
-            string pdf = Path.Combine(root, "currently_indexing.pdf");
-            string[] links;
-
-            try
+            string[]? links = await QueryCitations(id);
+            if (links == null)
             {
-                // Download the PDF to a temporary file.
-                using HttpClient client = new();
-                byte[] bytes = await client.GetByteArrayAsync($"https://arxiv.org/pdf/{id}");
-                await File.WriteAllBytesAsync(pdf, bytes);
-
-                // Open the PDF document to get the text.
-                using (PdfReader pdfReader = new(pdf))
-                {
-                    using (PdfDocument pdfDocument = new(pdfReader))
-                    {
-                        StringBuilder sb = new();
-                        for (int page = 1; page <= pdfDocument.GetNumberOfPages(); page++)
-                        {
-                            sb.Append(PdfTextExtractor.GetTextFromPage(pdfDocument.GetPage(page)));
-                        }
-                
-                        // Extract the links from the PDF.
-                        links = GetLinks(sb.ToString(), id);
-                    }
-                }
-                
-                File.Delete(pdf);
-            }
-            catch (Exception e)
-            {
-                await Console.Error.WriteLineAsync($"{id} - An error occurred getting the PDF - {e.Message}");
-                try
-                {
-                    File.Delete(pdf);
-                }
-                catch
-                {
-                    // Ignored as this must not yet exist.
-                }
-                
                 continue;
             }
             
@@ -574,43 +578,6 @@ public static partial class ArXiv
     }
 
     /// <summary>
-    /// Get all potential links for a file.
-    /// </summary>
-    /// <param name="text">The text to extract links to other files from.</param>
-    /// <param name="id">The ID of the file as we should not link to ourselves.</param>
-    /// <returns></returns>
-    private static string[] GetLinks(string text, string id)
-    {
-        // All possible starting configurations.
-        string[] starts = ["arXiv:", "arxiv.org/abs/", "https://arxiv.org/abs/"];
-
-        // Build all links.
-        HashSet<string> links = [];
-        foreach (string split in text.Split())
-        {
-            // Check if the current split is of the form for arXiv files.
-            foreach (string start in starts)
-            {
-                if (!split.StartsWith(start))
-                {
-                    continue;
-                }
-                
-                // Parse out the link, removing the version ending as some arXiv links have.
-                string link = VersionRemover().Replace(NumericOnlyRegex().Replace(split.Replace(start, string.Empty), string.Empty).Trim('.'), string.Empty);
-                
-                // If this is not our document and it is a valid format, add it.
-                if (link != id && IsValidId().IsMatch(link))
-                {
-                    links.Add(link);
-                }
-            }
-        }
-
-        return links.OrderBy(x => x).ToArray();
-    }
-
-    /// <summary>
     /// Get an element from the XML.
     /// </summary>
     /// <param name="entry">The XML entry.</param>
@@ -662,5 +629,53 @@ public static partial class ArXiv
     {
         // These are common markdown or LaTeX symbols, so if they still exist, we did not catch them all.
         return s.Contains('\\') || s.Contains('^') || s.Contains('_') || s.Contains('$');
+    }
+    
+    /// <summary>
+    /// Helper class for parsing citations.
+    /// </summary>
+    public class OpenCitation
+    {
+        /// <summary>
+        /// The OCI which is not used.
+        /// </summary>
+        [JsonPropertyName("oci")]
+        public string Oci { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The paper which cited which is not used.
+        /// </summary>
+        [JsonPropertyName("cited")]
+        public string Cited { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The paper which was cited which is what we are interested in.
+        /// </summary>
+        [JsonPropertyName("citing")]
+        public string Citing { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The author which is not used.
+        /// </summary>
+        [JsonPropertyName("author_sc")]
+        public string AuthorSc { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The time this was created which is not used.
+        /// </summary>
+        [JsonPropertyName("creation")]
+        public string Creation { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The timespan which is not used.
+        /// </summary>
+        [JsonPropertyName("timespan")]
+        public string Timespan { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The journal which is not used.
+        /// </summary>
+        [JsonPropertyName("journal_sc")]
+        public string JournalSc { get; set; } = string.Empty;
     }
 }

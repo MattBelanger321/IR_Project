@@ -373,7 +373,7 @@ public static partial class Embeddings
             return;
         }
 
-        string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
+        string[] files = Directory.GetFiles(directory, "*.txt*", SearchOption.AllDirectories);
 
         // Get the directory that summaries could be in.
         string processedDirectory = $"{directory}{Processed}";
@@ -384,7 +384,7 @@ public static partial class Embeddings
 
         // See how many documents already exist.
         HashSet<string> allFiles = [];
-        foreach (string s in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
+        foreach (string s in Directory.GetFiles(processedDirectory, "*.txt*", SearchOption.AllDirectories))
         {
             allFiles.Add(Path.GetFileNameWithoutExtension(s));
         }
@@ -466,7 +466,7 @@ public static partial class Embeddings
         Dictionary<string, string> summaries = [];
         if (Directory.Exists(summariesDirectory))
         {
-            foreach (string file in Directory.GetFiles(summariesDirectory, "*.*", SearchOption.AllDirectories))
+            foreach (string file in Directory.GetFiles(summariesDirectory, "*.txt*", SearchOption.AllDirectories))
             {
                 summaries.Add(Path.GetFileNameWithoutExtension(file), file);
             }
@@ -477,14 +477,14 @@ public static partial class Embeddings
         Dictionary<string, string> processed = [];
         if (Directory.Exists(processedDirectory))
         {
-            foreach (string file in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
+            foreach (string file in Directory.GetFiles(processedDirectory, "*.txt*", SearchOption.AllDirectories))
             {
                 processed.Add(Path.GetFileNameWithoutExtension(file), file);
             }
         }
 
         // Iterate over all files in our dataset.
-        string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
+        string[] files = Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories);
         List<PointStruct> points = [];
         int index = 0;
         for (int i = 0; i < files.Length; i++)
