@@ -1,7 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using iText.Layout.Element;
 using Porter2Stemmer;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
@@ -496,7 +495,7 @@ public static partial class Embeddings
             string id = Path.GetFileNameWithoutExtension(files[i]);
 
             // Read the current file.
-            string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
+            string[] file = (await File.ReadAllTextAsync(files[i])).Split('\n');
 
             // See if we have already preprocessed the contents. Otherwise, preprocess it now.
             float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}"));

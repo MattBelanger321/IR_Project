@@ -66,18 +66,34 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="totalResults">The total number of results we want for our own database.</param>
     /// <param name="reset">If we want to reset the vector database or not.</param>
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, bool reset = false, double similarityThreshold = SimilarityThreshold)
+    /// <param name="download">If we should download documents.</param>
+    /// <param name="process">If we should process documents.</param>
+    /// <param name="summarize">If we should summarize documents.</param>
+    /// <param name="index">If we should index documents.</param>
+    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool index = true)
     {
         // Get all the documents to build our dataset.
-        await ArXiv.SaveDocumentsGetLinksAsync(maxResults: maxResults, totalResults: totalResults);
-
-        // Summarize documents.
-        await Ollama.Summarize();
+        if (download)
+        {
+            await ArXiv.SaveDocumentsGetLinksAsync(maxResults: maxResults, totalResults: totalResults);
+        }
 
         // Process all documents.
-        await Embeddings.Preprocess();
+        if (process)
+        {
+            await Embeddings.Preprocess();
+        }
+
+        // Summarize documents.
+        if (summarize)
+        {
+            await Ollama.Summarize();
+        }
 
         // Index our files.
-        await Embeddings.Index(reset, similarityThreshold);
+        if (index)
+        {
+            await Embeddings.Index(reset, similarityThreshold);
+        }
     }
 }
