@@ -19,7 +19,6 @@ public static class PageRank
         Console.WriteLine("Loading data for PageRank...");
         
         // Store the references to all files.
-        Dictionary<string, string[]> fileLinks = [];
         Dictionary<string, string[]> fileAuthors = [];
         Dictionary<string, string[]> fileCategories = [];
         
@@ -37,7 +36,6 @@ public static class PageRank
             string[] categories = file[4] == string.Empty ? [] : file[4].Split('|');
             
             // Add the information for each file.
-            fileLinks.Add(id, file[5] == string.Empty ? [] : file[5].Split('|'));
             fileAuthors.Add(id, authors);
             fileCategories.Add(id, categories);
 
@@ -70,10 +68,10 @@ public static class PageRank
 
         // Get the total number of references each file has.
         Dictionary<string, int> files = [];
-        foreach (string id in fileLinks.Keys)
+        foreach (string id in fileAuthors.Keys)
         {
             // Add the direct reference links.
-            files.Add(id, fileLinks[id].Length);
+            files.Add(id, 0);
             
             // Add other papers written by each author, not including this paper.
             foreach (string author in fileAuthors[id])
@@ -89,7 +87,7 @@ public static class PageRank
         }
         
         // Store how many pages we have.
-        double numPages = fileLinks.Count;
+        double numPages = fileAuthors.Count;
         double initialRank = 1.0 / numPages;
         
         // We must store the ranks and then new ranks every iteration to check the level of change.
@@ -97,7 +95,7 @@ public static class PageRank
         Dictionary<string, double> newRanks = [];
         
         // Assign initial ranks.
-        foreach (string id in fileLinks.Keys)
+        foreach (string id in fileAuthors.Keys)
         {
             ranks.Add(id, initialRank);
             newRanks.Add(id, initialRank);
@@ -107,7 +105,7 @@ public static class PageRank
         for (int i = 0; i < iterations; i++)
         {
             // Reset new ranks.
-            foreach (string id in fileLinks.Keys)
+            foreach (string id in fileAuthors.Keys)
             {
                 newRanks[id] = (1.0 - dampingFactor) / numPages;
             }
@@ -126,12 +124,6 @@ public static class PageRank
                 
                 // Determine the share value for each link.
                 double share = ranks[kvp.Key] / kvp.Value;
-                
-                // Calculate for every direct link.
-                foreach (string id in fileLinks[kvp.Key])
-                {
-                    newRanks[id] += dampingFactor * share;
-                }
 
                 // Calculate for every other paper the authors have written.
                 foreach (string author in fileAuthors[kvp.Key])
@@ -154,7 +146,7 @@ public static class PageRank
             
             // Distribute dangling node rank equally.
             double danglingContribution = dampingFactor * dangling / numPages;
-            foreach (string id in fileLinks.Keys)
+            foreach (string id in fileAuthors.Keys)
             {
                 newRanks[id] += danglingContribution;
             }

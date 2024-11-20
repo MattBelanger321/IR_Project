@@ -75,7 +75,7 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
         // Get all the documents to build our dataset.
         if (download)
         {
-            await ArXiv.SaveDocumentsGetLinksAsync(maxResults: maxResults, totalResults: totalResults);
+            await ArXiv.Scrape(maxResults: maxResults, totalResults: totalResults);
         }
 
         // Process all documents.
