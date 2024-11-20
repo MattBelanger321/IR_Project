@@ -434,6 +434,7 @@ Desktop.ini
 arXiv/
 arXiv_summaries/
 arXiv_processed/
+arXiv_clustering/
 
 # Python Virtual Environment
 venv/

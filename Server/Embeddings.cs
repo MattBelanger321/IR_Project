@@ -48,7 +48,7 @@ public static partial class Embeddings
     /// <summary>
     /// The preprocessed directory.
     /// </summary>
-    private const string Processed = "_processed";
+    public const string Processed = "_processed";
 
     /// <summary>
     /// The name of the custom stems file.
@@ -149,7 +149,7 @@ public static partial class Embeddings
     /// <summary>
     /// Load all vectors.
     /// </summary>
-    private static void LoadVectors()
+    public static void LoadVectors()
     {
         // If already loaded, there is nothing to do.
         if (Vectors.Count > 0)
@@ -184,7 +184,7 @@ public static partial class Embeddings
     /// </summary>
     /// <param name="text">The text to get the embeddings of.</param>
     /// <returns>The embeddings.</returns>
-    private static float[] GetEmbeddings(string text)
+    public static float[] GetEmbeddings(string text)
     {
         return GetEmbeddings(text, out int _);
     }
@@ -195,7 +195,7 @@ public static partial class Embeddings
     /// <param name="text">The text to get the embeddings of.</param>
     /// <param name="size">The number of words which matched embeddings.</param>
     /// <returns>The embeddings.</returns>
-    private static float[] GetEmbeddings(string text, out int size)
+    public static float[] GetEmbeddings(string text, out int size)
     {
         // Define the vector.
         size = 0;
@@ -444,7 +444,7 @@ public static partial class Embeddings
     {
         // Get all files.
         string directory = Values.GetDataset;
-        if (!Directory.Exists(Values.GetDataset))
+        if (!Directory.Exists(directory))
         {
             return;
         }

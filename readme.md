@@ -83,7 +83,6 @@ This will handle one-time building and indexing of the dataset from [arXiv](http
 - The third line has the date and time in the format of "YYYY-DD-MM hh:mm:ss".
 - The fourth line has all authors separated by a "|".
 - The fifth line has all categories separated by a "|", with the primary category being the first one.
-- The sixth link has the IDs of all [arXiv](https://arxiv.org "arXiv") documents which this document links to.
 - All text has been preprocessed, ensuring all whitespace has been replaced by single spaces. Additionally, LaTeX/Markdown has been converted over to plain text.
 
 # Key Terms and Abbreviations
