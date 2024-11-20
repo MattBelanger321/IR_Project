@@ -39,6 +39,11 @@ public static partial class Embeddings
     /// Key for the updated time.
     /// </summary>
     private const string UpdatedKey = "updated";
+    
+    /// <summary>
+    /// Key for the custom scores.
+    /// </summary>
+    private const string ScoreKey = "id";
 
     /// <summary>
     /// The preprocessed directory.
@@ -74,6 +79,16 @@ public static partial class Embeddings
     /// The number of times to attempt spell correction.
     /// </summary>
     private const int Attempts = 5;
+
+    /// <summary>
+    /// Vector similarity weight.
+    /// </summary>
+    private const double Alpha = 1;
+
+    /// <summary>
+    /// PageRank weight.
+    /// </summary>
+    private const double Beta = 1;
 
     /// <summary>
     /// Spell checking affinity file.
@@ -528,7 +543,7 @@ public static partial class Embeddings
 
             points.Add(new()
             {
-                Id = (ulong)index,
+                Id = (ulong) index,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
                 Vectors = GetEmbeddings(processed.TryGetValue(id, out string? q) ? await File.ReadAllTextAsync(q) : Preprocess($"{file[0]} {file[1]}")),
                 Payload = {
@@ -537,7 +552,8 @@ public static partial class Embeddings
                     // Try and load the LLM summary if it exists.
                     [SummaryKey] = summaries.TryGetValue(id, out string? s) ? await File.ReadAllTextAsync(s) : file[1],
                     [UpdatedKey] = file[2],
-                    [AuthorsKey] = file[3]
+                    [AuthorsKey] = file[3],
+                    [ScoreKey] = 0 // TODO - Need to replace with the actual embeddings results.
                 }
             });
             
@@ -566,20 +582,22 @@ public static partial class Embeddings
     /// <param name="start">The starting search index.</param>
     /// <param name="count">The number of documents to retrieve at most.</param>
     /// <param name="attempts">The number of times to attempt spell correction.</param>
+    /// <param name="alpha">Vector similarity weight.</param>
+    /// <param name="beta">PageRank weight.</param>
     /// <returns>The results of the query.</returns>
-    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts)
+    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts, double alpha = Alpha, double beta = Beta)
     {
         QueryResult result = new();
 
         // Ensure our vector embeddings are loaded.
         LoadVectors();
-
-        Query query;
-
+        
         // If we are looking for similar documents, query by the ID.
-        if (id != null)
+        Query query;
+        ulong? idNumber = id is null ? null : ulong.Parse(id);
+        if (idNumber != null)
         {
-            query = ulong.Parse(id);
+            query = idNumber;
         }
 
         // Otherwise, compute based on the query string.
@@ -662,13 +680,21 @@ public static partial class Embeddings
         // Run the query.
         try
         {
-            IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, limit: (ulong)(start + count));
-            int number = Math.Min(count, points.Count - start);
-            for (int i = 0; i < number; i++)
+            // Get the given batch of points.
+            IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, offset: (ulong) start, limit: (ulong) count);
+            
+            // This local batch of points is then sorted by a weighted score taking into account PageRank results.
+            foreach (ScoredPoint point in points.OrderByDescending(x => ScoreResult(x, alpha, beta)))
             {
+                // If this was the field searched for during similar searching, ignore it.
+                if (idNumber != null && idNumber == point.Id.Num)
+                {
+                    continue;
+                }
+                
                 // Build the authors.
                 List<string> authors = [];
-                string rawAuthors = points[i].Payload[AuthorsKey].StringValue;
+                string rawAuthors = point.Payload[AuthorsKey].StringValue;
                 if (rawAuthors != null)
                 {
                     authors.AddRange(rawAuthors.Split('|'));
@@ -677,12 +703,12 @@ public static partial class Embeddings
                 // Add the document.
                 result.SearchDocuments.Add(new()
                 {
-                    IndexId = points[i].Id.Num,
-                    ArXivId = points[i].Payload[IdKey].StringValue,
-                    Title = points[i].Payload[TitleKey].StringValue,
-                    Summary = points[i].Payload[SummaryKey].StringValue,
+                    IndexId = point.Id.Num,
+                    ArXivId = point.Payload[IdKey].StringValue,
+                    Title = point.Payload[TitleKey].StringValue,
+                    Summary = point.Payload[SummaryKey].StringValue,
                     Authors = authors.ToArray(),
-                    Updated = DateTime.Parse(points[i].Payload[UpdatedKey].StringValue)
+                    Updated = DateTime.Parse(point.Payload[UpdatedKey].StringValue)
                 });
             }
         }
@@ -692,6 +718,18 @@ public static partial class Embeddings
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Score how well a matched point is by factoring in the PageRank score.
+    /// </summary>
+    /// <param name="point">The point.</param>
+    /// <param name="alpha">Vector similarity weight.</param>
+    /// <param name="beta">PageRank weight.</param>
+    /// <returns>The score.</returns>
+    private static double ScoreResult(ScoredPoint point, double alpha = Alpha, double beta = Beta)
+    {
+        return alpha * point.Score + beta * point.Payload[ScoreKey].DoubleValue;
     }
 
     /// <summary>

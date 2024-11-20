@@ -65,6 +65,22 @@ public static class PageRank
                 }
             }
         }
+        
+        // Remove authors and categories which only have a single entry.
+        authorFiles = authorFiles.Where(x => x.Value.Count > 1).ToDictionary();
+        categoryFiles = categoryFiles.Where(x => x.Value.Count > 1).ToDictionary();
+
+        // Remove authors which were only for said paper.
+        foreach (string id in fileAuthors.Keys)
+        {
+            fileAuthors[id] = fileAuthors[id].Where(x => authorFiles.ContainsKey(x)).ToArray();
+        }
+        
+        // Remove categories which were only for said paper.
+        foreach (string id in fileCategories.Keys)
+        {
+            fileCategories[id] = fileCategories[id].Where(x => categoryFiles.ContainsKey(x)).ToArray();
+        }
 
         // Get the total number of references each file has.
         Dictionary<string, int> files = [];

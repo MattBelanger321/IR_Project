@@ -151,6 +151,7 @@ public static partial class ArXiv
         while (existing.Count < totalResults)
         {
             // Make the HTTP GET request.
+            Console.WriteLine($"Requesting {maxResults} results from arXiv...");
             HttpResponseMessage response = await new HttpClient().GetAsync($"{QueryBase}search_query={query}&start={startIndex}&max_results={maxResults}&sortBy={sortBy}&sortOrder={sortOrder}");
 
             // Stop if there is an error.
@@ -204,7 +205,7 @@ public static partial class ArXiv
                 
                 // Get the time it was last updated.
                 XElement? element = entry.Element($"{XmlCore}updated");
-            
+                
                 // If this is missing, look for the published time.
                 if (element == null)
                 {
@@ -219,7 +220,7 @@ public static partial class ArXiv
 
                 // Extract all numbers from the string.
                 string[] raw = OnlyNumbers().Replace(element.Value, " ").Split(' ');
-            
+                
                 // Cast to numbers, padding with zeros if any happened to be missing.
                 int[] values = new int[6];
                 for (int i = 0; i < values.Length; i++)
@@ -270,20 +271,20 @@ public static partial class ArXiv
                     continue;
                 }
                 
-                // Format the categories and authors.
+                // Format fields to store.
                 string categoriesString = string.Join("|", categories);
                 string authorsString = string.Join("|", authors);
 
                 // Build the new file.
                 string contents = $"{title}\n{summary}\n{updated.Value.Year}-{updated.Value.Month}-{updated.Value.Day} {updated.Value.Hour}:{updated.Value.Minute}:{updated.Value.Second}\n{authorsString}\n{categoriesString}";
-                    
-                // Save to the primary path.
+                
+                // Save to the main category.
                 string instancePath = Path.Combine(directoryPath, categories[0]);
                 if (!Directory.Exists(instancePath))
                 {
                     Directory.CreateDirectory(instancePath);
                 }
-                    
+                
                 // Write to the new file.
                 await File.WriteAllTextAsync(Path.Combine(instancePath, $"{id}.txt"), contents);
                 existing.Add(id);
