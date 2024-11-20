@@ -7,7 +7,30 @@ namespace SearchEngine.Server;
 /// </summary>
 public static class PageRank
 {
-    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = 0.85, int iterations = 100, double tolerance = 1e-6)
+    /// <summary>
+    /// The dampening factor.
+    /// </summary>
+    public const double DampingFactor = 0.85;
+    
+    /// <summary>
+    /// The tolerance to stop at.
+    /// </summary>
+    public const int Iterations = 100;
+    
+    /// <summary>
+    /// If results should be sorted.
+    /// </summary>
+    public const double Tolerance = 1e-6;
+    
+    /// <summary>
+    /// Perform PageRank.
+    /// </summary>
+    /// <param name="dampingFactor">The dampening factor.</param>
+    /// <param name="iterations">The max number of iterations.</param>
+    /// <param name="tolerance">The tolerance to stop at.</param>
+    /// <param name="sort">If results should be sorted.</param>
+    /// <returns>True results of the PageRank.</returns>
+    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = DampingFactor, int iterations = Iterations, double tolerance = Tolerance, bool sort = false)
     {
         // If there are no pages, there is nothing to do.
         string directoryPath = Values.GetDataset;
@@ -208,7 +231,7 @@ public static class PageRank
             }
         }
 
-        // Return the results, sorted by ranking and with any ties going to newer papers.
-        return ranks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary();
+        // Return the results, sorted by ranking and with any ties going to newer papers if sorting should be done.
+        return sort ? ranks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary() : ranks;
     }
 }

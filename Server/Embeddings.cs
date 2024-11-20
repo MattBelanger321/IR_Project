@@ -43,7 +43,7 @@ public static partial class Embeddings
     /// <summary>
     /// Key for the custom scores.
     /// </summary>
-    private const string ScoreKey = "id";
+    private const string ScoreKey = "score";
 
     /// <summary>
     /// The preprocessed directory.
@@ -439,7 +439,8 @@ public static partial class Embeddings
     /// </summary>
     /// <param name="reset">If we want to reset the vector database or not.</param>
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
-    public static async Task Index(bool reset = false, double similarityThreshold = 1)
+    /// <param name="ranks">PageRank values.</param>
+    public static async Task Index(bool reset = false, double similarityThreshold = 1, Dictionary<string, double>? ranks = null)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -501,7 +502,6 @@ public static partial class Embeddings
         // Iterate over all files in our dataset.
         string[] files = Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories);
         List<PointStruct> points = [];
-        int index = 0;
         for (int i = 0; i < files.Length; i++)
         {
             Console.WriteLine($"Indexing file {i + 1} of {files.Length}");
@@ -515,6 +515,8 @@ public static partial class Embeddings
             // See if we have already preprocessed the contents. Otherwise, preprocess it now.
             float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}"));
 
+            Guid? guid = null;
+            
             try
             {
                 // See if there is a similar file.
@@ -523,13 +525,13 @@ public static partial class Embeddings
                 if (existing.Count > 0)
                 {
                     // If it is the same file, no reason to index it again.
-                    if (existing[0].Payload[IdKey].StringValue == id)
+                    if (guid.HasValue && existing[0].Payload[IdKey].StringValue == id)
                     {
-                        continue;
+                        guid = Guid.Parse(existing[0].Id.Uuid);
                     }
 
                     // If the document is similar enough, skip it.
-                    if (existing[0].Score >= similarityThreshold)
+                    else if (existing[0].Score >= similarityThreshold)
                     {
                         continue;
                     }
@@ -541,9 +543,12 @@ public static partial class Embeddings
                 break;
             }
 
+            // Create a new ID if one did not exist.
+            guid ??= Guid.NewGuid();
+
             points.Add(new()
             {
-                Id = (ulong) index,
+                Id = guid,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
                 Vectors = GetEmbeddings(processed.TryGetValue(id, out string? q) ? await File.ReadAllTextAsync(q) : Preprocess($"{file[0]} {file[1]}")),
                 Payload = {
@@ -553,11 +558,10 @@ public static partial class Embeddings
                     [SummaryKey] = summaries.TryGetValue(id, out string? s) ? await File.ReadAllTextAsync(s) : file[1],
                     [UpdatedKey] = file[2],
                     [AuthorsKey] = file[3],
-                    [ScoreKey] = 0 // TODO - Need to replace with the actual embeddings results.
+                    // Add the PageRank score.
+                    [ScoreKey] = ranks == null || !ranks.TryGetValue(id, out double rank) ? 0 : rank
                 }
             });
-            
-            index++;
         }
 
         // Nothing to do if no changes.
@@ -594,10 +598,9 @@ public static partial class Embeddings
         
         // If we are looking for similar documents, query by the ID.
         Query query;
-        ulong? idNumber = id is null ? null : ulong.Parse(id);
-        if (idNumber != null)
+        if (id != null)
         {
-            query = idNumber;
+            query = Guid.Parse(id);
         }
 
         // Otherwise, compute based on the query string.
@@ -684,10 +687,10 @@ public static partial class Embeddings
             IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, offset: (ulong) start, limit: (ulong) count);
             
             // This local batch of points is then sorted by a weighted score taking into account PageRank results.
-            foreach (ScoredPoint point in points.OrderByDescending(x => ScoreResult(x, alpha, beta)))
+            foreach (ScoredPoint point in points.OrderByDescending(x => ScoreResult(x, alpha, beta)).ThenByDescending(x => x.Payload[UpdatedKey].StringValue).ThenBy(x => x.Payload[TitleKey].StringValue))
             {
                 // If this was the field searched for during similar searching, ignore it.
-                if (idNumber != null && idNumber == point.Id.Num)
+                if (id != null && id == point.Id.Uuid)
                 {
                     continue;
                 }
@@ -703,7 +706,7 @@ public static partial class Embeddings
                 // Add the document.
                 result.SearchDocuments.Add(new()
                 {
-                    IndexId = point.Id.Num,
+                    IndexId = point.Id.Uuid,
                     ArXivId = point.Payload[IdKey].StringValue,
                     Title = point.Payload[TitleKey].StringValue,
                     Summary = point.Payload[SummaryKey].StringValue,

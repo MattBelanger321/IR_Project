@@ -23,7 +23,7 @@ public class SearchDocument
     /// <summary>
     /// The vector database index ID.
     /// </summary>
-    public ulong? IndexId { get; set; }
+    public string? IndexId { get; set; }
     
     /// <summary>
     /// The authors of the document.

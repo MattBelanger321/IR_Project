@@ -64,13 +64,16 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// </summary>
     /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="totalResults">The total number of results we want for our own database.</param>
+    /// <param name="iterations">The max number of PageRank iterations.</param>
+    /// <param name="tolerance">The PageRank tolerance to stop at.</param>
     /// <param name="reset">If we want to reset the vector database or not.</param>
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
     /// <param name="download">If we should download documents.</param>
     /// <param name="process">If we should process documents.</param>
     /// <param name="summarize">If we should summarize documents.</param>
+    /// <param name="rank">If we should run PageRank.</param>
     /// <param name="index">If we should index documents.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool index = true)
+    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int iterations = PageRank.Iterations, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool rank = true, bool index = true)
     {
         // Get all the documents to build our dataset.
         if (download)
@@ -90,10 +93,13 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
             await Ollama.Summarize();
         }
 
+        // Perform PageRank.
+        Dictionary<string, double>? ranks = rank ? await PageRank.Perform(dampingFactor, iterations) : null;
+
         // Index our files.
         if (index)
         {
-            await Embeddings.Index(reset, similarityThreshold);
+            await Embeddings.Index(reset, similarityThreshold, ranks);
         }
     }
 }

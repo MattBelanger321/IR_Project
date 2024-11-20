@@ -1,9 +1,4 @@
 ﻿using SearchEngine.Server;
 
 // Get all the documents to build our dataset, creating a fresh database for them.
-await ScrappingService.Scrape(2000, 2000, true, process:false, summarize:false, index: false);
-Dictionary<string, double> result = await PageRank.Perform();
-foreach (KeyValuePair<string, double> kvp in result)
-{
-    Console.WriteLine($"{kvp.Key} = {kvp.Value}");
-}
+await ScrappingService.Scrape(2000, 2000, reset:true, process:true, summarize:true, index: true);

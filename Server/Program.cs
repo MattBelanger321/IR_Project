@@ -8,7 +8,7 @@ builder.Services.AddRazorPages();
 // Due to free hosting file sizes, we are not running this in production.
 if (builder.Environment.IsDevelopment())
 {
-    builder.Services.AddHostedService<ScrappingService>();
+    //builder.Services.AddHostedService<ScrappingService>();
 }
 
 WebApplication app = builder.Build();
