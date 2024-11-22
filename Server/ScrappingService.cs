@@ -64,44 +64,32 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// </summary>
     /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="totalResults">The total number of results we want for our own database.</param>
+    /// <param name="discard">What percentage of terms to discard.</param>
     /// <param name="dampingFactor">The PageRank dampening factor.</param>
     /// <param name="max">The maximum clustering value to perform up to.</param>
     /// <param name="iterations">The max number of PageRank iterations.</param>
     /// <param name="tolerance">The PageRank tolerance to stop at.</param>
     /// <param name="reset">If we want to reset the vector database or not.</param>
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
-    /// <param name="download">If we should download documents.</param>
-    /// <param name="process">If we should process documents.</param>
-    /// <param name="mitigate">If we should calculate mitigated information.</param>
-    /// <param name="summarize">If we should summarize documents.</param>
+    /// <param name="mitigate">If we should run mitigation.</param>
     /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
-    /// <param name="index">If we should index documents.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool mitigate = true, bool summarize = true, bool cluster = true, bool rank = true, bool index = true)
+    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, float discard = 0, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool mitigate = true, bool cluster = true, bool rank = true)
     {
         // Get all the documents to build our dataset.
-        if (download)
-        {
-            await ArXiv.Scrape(maxResults: maxResults, totalResults: totalResults);
-        }
+        await ArXiv.Scrape(maxResults: maxResults, totalResults: totalResults);
 
         // Process all documents.
-        if (process)
-        {
-            await Embeddings.Preprocess();
-        }
+        await Embeddings.Preprocess();
 
         // Calculate mitigated information.
         if (mitigate)
         {
-            await MitigatedInformation.Perform();
+            await MitigatedInformation.Perform(discard);
         }
-
-        // Summarize documents.
-        if (summarize)
-        {
-            await Ollama.Summarize();
-        }
+        
+        // Process all documents with mitigated information.
+        await Embeddings.Preprocess(true);
 
         // Perform clustering.
         Dictionary<int, Dictionary<int, HashSet<string>>> clusters = cluster ? await Clustering.Perform(max) : await Clustering.Load();
@@ -109,10 +97,10 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
         // Perform PageRank.
         Dictionary<string, double> ranks = rank ? await PageRank.Perform(dampingFactor, iterations, tolerance, clusters) : await PageRank.Load();
 
+        // Summarize documents.
+        await Ollama.Summarize();
+
         // Index our files.
-        if (index)
-        {
-            await Embeddings.Index(reset, similarityThreshold, ranks);
-        }
+        await Embeddings.Index(reset, similarityThreshold, ranks);
     }
 }

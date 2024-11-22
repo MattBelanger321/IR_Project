@@ -35,9 +35,8 @@ public static class PageRank
     /// <param name="iterations">The max number of iterations.</param>
     /// <param name="tolerance">The tolerance to stop at.</param>
     /// <param name="clusters">The clustering results of pages.</param>
-    /// <param name="sort">If results should be sorted.</param>
     /// <returns>True results of the PageRank.</returns>
-    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = DampingFactor, int iterations = Iterations, double tolerance = Tolerance, Dictionary<int, Dictionary<int, HashSet<string>>>? clusters = null, bool sort = false)
+    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = DampingFactor, int iterations = Iterations, double tolerance = Tolerance, Dictionary<int, Dictionary<int, HashSet<string>>>? clusters = null)
     {
         // If there are no pages, there is nothing to do.
         string directoryPath = Values.GetDataset;
@@ -282,6 +281,9 @@ public static class PageRank
             }
         }
 
+        // Sort the ranks for visibility.
+        newRanks = newRanks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary();
+
         StringBuilder sb = new("ID,Score");
         foreach (KeyValuePair<string, double> rank in newRanks)
         {
@@ -291,7 +293,7 @@ public static class PageRank
         await File.WriteAllTextAsync(Path.Combine(Values.GetRootDirectory() ?? string.Empty, FileName), sb.ToString());
 
         // Return the results, sorted by ranking and with any ties going to newer papers if sorting should be done.
-        return sort ? newRanks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary() : newRanks;
+        return newRanks;
     }
 
     /// <summary>

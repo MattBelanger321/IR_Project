@@ -134,7 +134,7 @@ public static partial class Embeddings
     /// <summary>
     /// The mitigated information to discard.
     /// </summary>
-    public static readonly Dictionary<string, float> DiscardTerms = new();
+    public static readonly HashSet<string> DiscardTerms = [];
 
     /// <summary>
     /// The word2vec generated vectors.
@@ -309,8 +309,9 @@ public static partial class Embeddings
     /// Preprocess a string for indexing.
     /// </summary>
     /// <param name="s">The string to preprocess.</param>
+    /// <param name="mitigate">If we should remove mitigated information or not.</param>
     /// <returns>The preprocessed string.</returns>
-    public static string Preprocess(string s)
+    public static string Preprocess(string s, bool mitigate = false)
     {
         // Ensure mappings are loaded.
         LoadMappings();
@@ -368,10 +369,17 @@ public static partial class Embeddings
         foreach (string term in terms)
         {
             // Do not add stop words.
-            if (!StopWords.Contains(term))
+            if (StopWords.Contains(term))
             {
-                // Run our custom stemming followed by a porter stemming.
-                Builder.Append(' ').Append(Stemmer.Stem(Stems.FirstOrDefault(x => term.StartsWith(x)) ?? term).Value);
+                continue;
+            }
+
+            // Run our custom stemming followed by a porter stemming.
+            string final = Stemmer.Stem(Stems.FirstOrDefault(x => term.StartsWith(x)) ?? term).Value;
+
+            if (!mitigate || !DiscardTerms.Contains(final))
+            {
+                Builder.Append(' ').Append(final);
             }
         }
 
@@ -383,8 +391,9 @@ public static partial class Embeddings
 
     /// <summary>
     /// Preprocess all documents.
+    /// <param name="mitigate">If we should remove mitigated information or not.</param>
     /// </summary>
-    public static async Task Preprocess()
+    public static async Task Preprocess(bool mitigate = false)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -397,6 +406,11 @@ public static partial class Embeddings
 
         // Get the directory that summaries could be in.
         string processedDirectory = $"{directory}{Processed}";
+        if (mitigate)
+        {
+            processedDirectory += MitigatedInformation.Folder;
+        }
+        
         if (!Directory.Exists(processedDirectory))
         {
             Directory.CreateDirectory(processedDirectory);
@@ -412,7 +426,10 @@ public static partial class Embeddings
         // Iterate over all files in our dataset.
         for (int i = 0; i < files.Length; i++)
         {
-            Console.WriteLine($"Preprocessing file {i + 1} of {files.Length}");
+            Console.WriteLine(mitigate
+                ? $"Preprocessing with mitigation file {i + 1} of {files.Length}"
+                : $"Preprocessing file {i + 1} of {files.Length}");
+
 
             // The ID is the file name.
             string id = Path.GetFileNameWithoutExtension(files[i]);
@@ -434,7 +451,7 @@ public static partial class Embeddings
                 Directory.CreateDirectory(categoryPath);
             }
             
-            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
+            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}", mitigate));
             allFiles.Add(id);
         }
     }
@@ -500,7 +517,7 @@ public static partial class Embeddings
         }
 
         // Get existing preprocessed contents.
-        string processedDirectory = $"{directory}{Processed}";
+        string processedDirectory = $"{directory}{Processed}{MitigatedInformation.Folder}";
         Dictionary<string, string> processed = [];
         if (Directory.Exists(processedDirectory))
         {
@@ -524,7 +541,7 @@ public static partial class Embeddings
             string[] file = (await File.ReadAllTextAsync(files[i])).Split('\n');
 
             // See if we have already preprocessed the contents. Otherwise, preprocess it now.
-            float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}"));
+            float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}", true));
 
             Guid? guid = null;
             
@@ -623,7 +640,7 @@ public static partial class Embeddings
         // Otherwise, compute based on the query string.
         else
         {
-            float[] vectors = GetEmbeddings(Preprocess(queryString ?? string.Empty), out int size);
+            float[] vectors = GetEmbeddings(Preprocess(queryString ?? string.Empty, true), out int size);
 
             // If there was no matching vectors and the query string was not empty, attempt spelling correction.
             if (size < 1 && !string.IsNullOrWhiteSpace(queryString))
@@ -662,7 +679,7 @@ public static partial class Embeddings
 
                     // Built the corrected string.
                     string raw = string.Join(" ", words);
-                    string correctedQuery = Preprocess(raw);
+                    string correctedQuery = Preprocess(raw, true);
 
                     // If the strings are equal, there is nothing else to change.
                     if (queryString == correctedQuery)
@@ -673,9 +690,9 @@ public static partial class Embeddings
                     // Otherwise, see if there is any improvements with the vector embeddings.
                     queryString = correctedQuery;
                     result.CorrectedQuery = raw;
-                    vectors = GetEmbeddings(Preprocess(queryString), out size);
+                    vectors = GetEmbeddings(Preprocess(queryString, true), out size);
 
-                    // If there was at least one matching vector, we are ready to query..
+                    // If there was at least one matching vector, we are ready to query.
                     if (size > 0)
                     {
                         break;

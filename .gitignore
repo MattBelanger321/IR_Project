@@ -298,10 +298,6 @@ node_modules/
 *.dsw
 *.dsp
 
-# Visual Studio 6 technical files
-*.ncb
-*.aps
-
 # Visual Studio LightSwitch build output
 **/*.HTMLClient/GeneratedArtifacts
 **/*.DesktopClient/GeneratedArtifacts
@@ -417,13 +413,6 @@ FodyWeavers.xsd
 **/.idea/**/*.iml
 **/.idea/**/contentModel.xml
 **/.idea/**/modules.xml
-
-*.suo
-*.user
-.vs/
-[Bb]in/
-[Oo]bj/
-_UpgradeReport_Files/
 [Pp]ackages/
 
 Thumbs.db
@@ -434,6 +423,7 @@ Desktop.ini
 arXiv/
 arXiv_summaries/
 arXiv_processed/
+arXiv_processed_mitigated/
 arXiv_clustering/
 arXiv_mitigated/
 page_rank.csv
