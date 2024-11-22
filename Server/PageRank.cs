@@ -1,4 +1,5 @@
-﻿using SearchEngine.Shared;
+﻿using System.Text;
+using SearchEngine.Shared;
 
 namespace SearchEngine.Server;
 
@@ -21,6 +22,11 @@ public static class PageRank
     /// If results should be sorted.
     /// </summary>
     public const double Tolerance = 1e-6;
+
+    /// <summary>
+    /// The file to save to.
+    /// </summary>
+    private const string FileName = "page_rank.csv";
     
     /// <summary>
     /// Perform PageRank.
@@ -28,9 +34,10 @@ public static class PageRank
     /// <param name="dampingFactor">The dampening factor.</param>
     /// <param name="iterations">The max number of iterations.</param>
     /// <param name="tolerance">The tolerance to stop at.</param>
+    /// <param name="clusters">The clustering results of pages.</param>
     /// <param name="sort">If results should be sorted.</param>
     /// <returns>True results of the PageRank.</returns>
-    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = DampingFactor, int iterations = Iterations, double tolerance = Tolerance, bool sort = false)
+    public static async Task<Dictionary<string, double>> Perform(double dampingFactor = DampingFactor, int iterations = Iterations, double tolerance = Tolerance, Dictionary<int, Dictionary<int, HashSet<string>>>? clusters = null, bool sort = false)
     {
         // If there are no pages, there is nothing to do.
         string directoryPath = Values.GetDataset;
@@ -38,6 +45,9 @@ public static class PageRank
         {
             return [];
         }
+
+        // Load clusters if they have not been passed.
+        clusters ??= await Clustering.Load();
         
         Console.WriteLine("Loading data for PageRank...");
         
@@ -48,6 +58,9 @@ public static class PageRank
         // All lookup to similar files by author or category.
         Dictionary<string, HashSet<string>> authorFiles = [];
         Dictionary<string, HashSet<string>> categoryFiles = [];
+        
+        // Map what clusters each file is in.
+        Dictionary<string, Dictionary<int, int>> fileClusters = new();
         
         // Load all files.
         foreach (string s in Directory.GetFiles(directoryPath, "*.txt", SearchOption.AllDirectories))
@@ -87,6 +100,27 @@ public static class PageRank
                     categoryFiles.Add(category, [id]);
                 }
             }
+            
+            // Ensure there is an entry for this cluster.
+            fileClusters.Add(id, new());
+        }
+        
+        // Cache the clusters for every file.
+        foreach (KeyValuePair<int, Dictionary<int, HashSet<string>>> cluster in clusters)
+        {
+            // Check every level of clustering.
+            foreach (KeyValuePair<int, HashSet<string>> labels in cluster.Value)
+            {
+                // Check the label for every file.
+                foreach (string label in labels.Value)
+                {
+                    // If this file exists, add the label it is in for this level of clustering.
+                    if (fileClusters.TryGetValue(label, out Dictionary<int, int>? value))
+                    {
+                        value.Add(cluster.Key, labels.Key);
+                    }
+                }
+            }
         }
         
         // Remove authors and categories which only have a single entry.
@@ -122,6 +156,12 @@ public static class PageRank
             foreach (string category in fileCategories[id])
             {
                 files[id] += categoryFiles[category].Count(x => x != id);
+            }
+
+            // Count how many items can be reached by each cluster.
+            foreach (KeyValuePair<int, int> cluster in fileClusters[id])
+            {
+                files[id] += clusters[cluster.Key][cluster.Value].Count(x => x != id);
             }
         }
         
@@ -181,6 +221,15 @@ public static class PageRank
                         newRanks[id] += dampingFactor * share;
                     }
                 }
+
+                // Calculate for every other paper in each cluster the paper is in.
+                foreach (KeyValuePair<int, int> cluster in fileClusters[kvp.Key])
+                {
+                    foreach (string id in clusters[cluster.Key][cluster.Value].Where(x => x != kvp.Key))
+                    {
+                        newRanks[id] += dampingFactor * share;
+                    }
+                }
             }
             
             // Distribute dangling node rank equally.
@@ -218,11 +267,13 @@ public static class PageRank
             }
             
             // Check for convergence and stop if it has been reached.
-            Console.WriteLine($"PageRank | Iteration {i + 1} of {iterations} | {sum} < {tolerance}");
             if (sum < tolerance)
             {
+                Console.WriteLine($"PageRank | Iteration {i + 1} of {iterations} | {sum} < {tolerance} | Stopping Early");
                 break;
             }
+            
+            Console.WriteLine($"PageRank | Iteration {i + 1} of {iterations} | {sum} >= {tolerance}");
             
             // Update ranks for the next iteration.
             foreach (string id in newRanks.Keys)
@@ -231,7 +282,41 @@ public static class PageRank
             }
         }
 
+        StringBuilder sb = new("ID,Score");
+        foreach (KeyValuePair<string, double> rank in newRanks)
+        {
+            sb.Append($"\n{rank.Key},{rank.Value}");
+        }
+        
+        await File.WriteAllTextAsync(Path.Combine(Values.GetRootDirectory() ?? string.Empty, FileName), sb.ToString());
+
         // Return the results, sorted by ranking and with any ties going to newer papers if sorting should be done.
-        return sort ? ranks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary() : ranks;
+        return sort ? newRanks.OrderByDescending(x => x.Value).ThenByDescending(x => x.Key).ToDictionary() : newRanks;
+    }
+
+    /// <summary>
+    /// Load PageRank values.
+    /// </summary>
+    /// <returns>The PageRank values.</returns>
+    public static async Task<Dictionary<string, double>> Load()
+    {
+        // Nothing to do if the folder does not exist.
+        string file = $"{Values.GetDataset}{FileName}";
+        if (!File.Exists(FileName))
+        {
+            return [];
+        }
+        
+        // Load the ranks from the saved file.
+        Dictionary<string, double> ranks = new();
+        string[] lines = (await File.ReadAllTextAsync(file)).Split('\n');
+        for (int i = 1; i < lines.Length; i++)
+        {
+            string[] split = lines[i].Split(',');
+            ranks.Add(split[0], double.Parse(split[1]));
+        }
+
+        // Return the loaded ranks.
+        return ranks;
     }
 }

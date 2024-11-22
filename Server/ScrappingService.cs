@@ -64,6 +64,8 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// </summary>
     /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="totalResults">The total number of results we want for our own database.</param>
+    /// <param name="dampingFactor">The PageRank dampening factor.</param>
+    /// <param name="max">The maximum clustering value to perform up to.</param>
     /// <param name="iterations">The max number of PageRank iterations.</param>
     /// <param name="tolerance">The PageRank tolerance to stop at.</param>
     /// <param name="reset">If we want to reset the vector database or not.</param>
@@ -71,9 +73,10 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="download">If we should download documents.</param>
     /// <param name="process">If we should process documents.</param>
     /// <param name="summarize">If we should summarize documents.</param>
+    /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
     /// <param name="index">If we should index documents.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int iterations = PageRank.Iterations, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool rank = true, bool index = true)
+    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool cluster = true, bool rank = true, bool index = true)
     {
         // Get all the documents to build our dataset.
         if (download)
@@ -93,8 +96,10 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
             await Ollama.Summarize();
         }
 
+        Dictionary<int, Dictionary<int, HashSet<string>>> clusters = cluster ? await Clustering.Perform(max) : await Clustering.Load();
+
         // Perform PageRank.
-        Dictionary<string, double>? ranks = rank ? await PageRank.Perform(dampingFactor, iterations) : null;
+        Dictionary<string, double> ranks = rank ? await PageRank.Perform(dampingFactor, iterations, tolerance, clusters) : await PageRank.Load();
 
         // Index our files.
         if (index)

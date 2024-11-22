@@ -18,17 +18,18 @@ public static class Clustering
     /// Perform clustering.
     /// </summary>
     /// <param name="max">The maximum clustering value to perform up to.</param>
-    public static async Task Perform(int? max = null)
+    /// <returns>The clustering results.</returns>
+    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int? max = null)
     {
         // Ensure embeddings are loaded.
         Embeddings.LoadVectors();
         
-        // Get all files.
+        // Nothing to do if the folder does not exist.
         string directory = Values.GetDataset;
         string processedDirectory = $"{directory}{Embeddings.Processed}";
         if (!Directory.Exists(processedDirectory))
         {
-            return;
+            return new();
         }
         
         Console.WriteLine("Preparing data for clustering...");
@@ -73,6 +74,9 @@ public static class Clustering
             Directory.CreateDirectory(clusteringDirectory);
         }
 
+        // Store all results to return.
+        Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
+
         // Loop from two clusters up to the maximum amount.
         for (int n = 2; n <= max; n++)
         {
@@ -81,15 +85,88 @@ public static class Clustering
             // Compute the clusters.
             KMeansClusterCollection clusters = new KMeans(n).Learn(vectors);
 
+            // Store the results for this cluster.
+            Dictionary<int, HashSet<string>> result = new();
+
             // Build the CSV output.
             StringBuilder sb = new("File,Cluster");
+            
+            // Run for every embedding.
             foreach (KeyValuePair<string, double[]> kvp in embeddings)
             {
-                sb.Append($"\n{kvp.Key},{clusters.Decide(kvp.Value)}");
+                // Get the class it is clustered in.
+                int label = clusters.Decide(kvp.Value);
+                
+                // Save the result.
+                if (result.TryGetValue(label, out HashSet<string>? value))
+                {
+                    value.Add(kvp.Key);
+                }
+                else
+                {
+                    result.Add(label, [kvp.Key]);
+                }
+                
+                // Add the result to the CSV.
+                sb.Append($"\n{kvp.Key},{label}");
             }
+            
+            // Add the results for this clustering to the full results.
+            results.Add(n, result);
             
             // Save the output.
             await File.WriteAllTextAsync(Path.Combine(clusteringDirectory, $"{n}.csv"), sb.ToString());
         }
+        
+        // Return the results of the clustering.
+        return results;
+    }
+
+    /// <summary>
+    /// Load clustering results.
+    /// </summary>
+    /// <returns>The clustering results.</returns>
+    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Load()
+    {
+        // Nothing to do if the folder does not exist.
+        string directory = $"{Values.GetDataset}{Folder}";
+        if (!Directory.Exists(directory))
+        {
+            return new();
+        }
+        
+        // Store all results to return.
+        Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
+
+        // Check every existing cluster.
+        foreach (string file in Directory.GetFiles(directory, "*.csv*", SearchOption.AllDirectories))
+        {
+            // Load the contents of the CSV file.
+            string[] line = (await File.ReadAllTextAsync(file)).Split('\n');
+            
+            // Store the results for this cluster.
+            Dictionary<int, HashSet<string>> result = new();
+
+            // Load the class label for every entry.
+            for (int i = 1; i < line.Length; i++)
+            {
+                string[] split = line[i].Split(',');
+                int label = int.Parse(split[1]);
+                if (result.TryGetValue(label, out HashSet<string>? value))
+                {
+                    value.Add(split[0]);
+                }
+                else
+                {
+                    result.Add(label, [split[0]]);
+                }
+            }
+            
+            // Add the results for this cluster.
+            results.Add(int.Parse(Path.GetFileNameWithoutExtension(file)), result);
+        }
+        
+        // Return the results of the clustering.
+        return results;
     }
 }
