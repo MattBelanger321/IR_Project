@@ -300,9 +300,9 @@ public static class PageRank
     /// <returns>The PageRank values.</returns>
     public static async Task<Dictionary<string, double>> Load()
     {
-        // Nothing to do if the folder does not exist.
-        string file = $"{Values.GetDataset}{FileName}";
-        if (!File.Exists(FileName))
+        // Nothing to do if the file does not exist.
+        string file = $"{Values.GetRootDirectory() ?? string.Empty}{FileName}";
+        if (!File.Exists(file))
         {
             return [];
         }

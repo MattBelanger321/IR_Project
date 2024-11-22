@@ -23,6 +23,12 @@ public static class Clustering
     {
         // Ensure embeddings are loaded.
         Embeddings.LoadVectors();
+
+        // Load mitigated information.
+        if (Embeddings.DiscardTerms.Count < 1)
+        {
+            await MitigatedInformation.Load();
+        }
         
         // Nothing to do if the folder does not exist.
         string directory = Values.GetDataset;

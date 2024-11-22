@@ -132,6 +132,11 @@ public static partial class Embeddings
     private static readonly EnglishPorter2Stemmer Stemmer = new();
 
     /// <summary>
+    /// The mitigated information to discard.
+    /// </summary>
+    public static readonly Dictionary<string, float> DiscardTerms = new();
+
+    /// <summary>
     /// The word2vec generated vectors.
     /// </summary>
     private static readonly Dictionary<string, float[]> Vectors = new();
@@ -305,7 +310,7 @@ public static partial class Embeddings
     /// </summary>
     /// <param name="s">The string to preprocess.</param>
     /// <returns>The preprocessed string.</returns>
-    private static string Preprocess(string s)
+    public static string Preprocess(string s)
     {
         // Ensure mappings are loaded.
         LoadMappings();
@@ -452,6 +457,12 @@ public static partial class Embeddings
         // Ensure our vector mappings are loaded.
         LoadVectors();
 
+        // Load mitigated information.
+        if (DiscardTerms.Count < 1)
+        {
+            await MitigatedInformation.Load();
+        }
+
         // Try and delete the vector database for a complete reset if we should.
         if (reset)
         {
@@ -595,6 +606,12 @@ public static partial class Embeddings
 
         // Ensure our vector embeddings are loaded.
         LoadVectors();
+
+        // Load mitigated information.
+        if (DiscardTerms.Count < 1)
+        {
+            await MitigatedInformation.Load();
+        }
         
         // If we are looking for similar documents, query by the ID.
         Query query;

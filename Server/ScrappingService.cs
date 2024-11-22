@@ -72,11 +72,12 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
     /// <param name="download">If we should download documents.</param>
     /// <param name="process">If we should process documents.</param>
+    /// <param name="mitigate">If we should calculate mitigated information.</param>
     /// <param name="summarize">If we should summarize documents.</param>
     /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
     /// <param name="index">If we should index documents.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool summarize = true, bool cluster = true, bool rank = true, bool index = true)
+    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool download = true, bool process = true, bool mitigate = true, bool summarize = true, bool cluster = true, bool rank = true, bool index = true)
     {
         // Get all the documents to build our dataset.
         if (download)
@@ -90,12 +91,19 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
             await Embeddings.Preprocess();
         }
 
+        // Calculate mitigated information.
+        if (mitigate)
+        {
+            await MitigatedInformation.Perform();
+        }
+
         // Summarize documents.
         if (summarize)
         {
             await Ollama.Summarize();
         }
 
+        // Perform clustering.
         Dictionary<int, Dictionary<int, HashSet<string>>> clusters = cluster ? await Clustering.Perform(max) : await Clustering.Load();
 
         // Perform PageRank.

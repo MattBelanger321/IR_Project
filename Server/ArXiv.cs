@@ -43,11 +43,19 @@ public static partial class ArXiv
     /// <summary>
     /// All arXiv computer science categories.
     /// </summary>
-    private static readonly string[] Categories = [
+    private static readonly string[] ComputerScienceCategories = [
         "cs.AI", "cs.AR", "cs.CC", "cs.CE", "cs.CG", "cs.CL", "cs.CR", "cs.CV", "cs.CY", "cs.DB", "cs.DC", "cs.DL",
         "cs.DM", "cs.DS", "cs.ET", "cs.FL", "cs.GL", "cs.GR", "cs.GT", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.LO",
         "cs.MA", "cs.MM", "cs.MS", "cs.NA", "cs.NE", "cs.NI", "cs.OH", "cs.OS", "cs.PF", "cs.PL", "cs.RO", "cs.SC",
         "cs.SD", "cs.SE", "cs.SI", "cs.SY"
+    ];
+
+    /// <summary>
+    /// Valid starts to categories so we can discard illegal ones.
+    /// </summary>
+    private static readonly string[] ValidCategoryStarts = [
+        "cs.", "econ.", "eess.", "math.", "astro-ph.", "cond-mat.", "gr-qc", "hep-ex", "hep-lat", "hep-ph", "hep-th",
+        "math-ph", "nlin.", "nucl-ex", "nucl-th", "physics.", "quant-ph", "q-bio.", "q-fin.", "stat."
     ];
     
     /// <summary>
@@ -139,10 +147,10 @@ public static partial class ArXiv
         }
 
         // Build the query to search in all computer science categories.
-        string[] options = new string[Categories.Length];
+        string[] options = new string[ComputerScienceCategories.Length];
         for (int i = 0; i < options.Length; i++)
         {
-            options[i] = $"cat: {Categories[i]}";
+            options[i] = $"cat: {ComputerScienceCategories[i]}";
         }
         string query = string.Join("+OR+", options);
         
@@ -259,7 +267,15 @@ public static partial class ArXiv
 
                     // If this category has not yet been added, add it.
                     string category = CleanString(term.Value);
-                    if (!categories.Contains(category))
+
+                    // If there are illegal characters, remove this category.
+                    if (category.Contains(',') || category.Contains(';') || category.Contains(' '))
+                    {
+                        continue;
+                    }
+
+                    // If this category has not been listed yet and it is valid, save it.
+                    if (!categories.Contains(category) && ValidCategoryStarts.Any(start => category.StartsWith(start)))
                     {
                         categories.Add(category);
                     }
