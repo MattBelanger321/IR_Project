@@ -427,7 +427,7 @@ arXiv_processed_mitigated/
 arXiv_clustering/
 arXiv_mitigated/
 page_rank.csv
-mitigated.csv
+mitigated.txt
 
 # Python Virtual Environment
 venv/

@@ -17,7 +17,7 @@ public static class MitigatedInformation
     /// <summary>
     /// The file to save to.
     /// </summary>
-    private const string FileName = "mitigated.csv";
+    private const string FileName = "mitigated.txt";
     
     /// <summary>
     /// Calculate cumulative mitigated information across all classes to be discarded.
@@ -55,8 +55,8 @@ public static class MitigatedInformation
         // Store the number of times that a term appears in a given category.
         Dictionary<string, Dictionary<string, int>> categoryTerms = new();
         
-        // Store the cumulative mitigated information for each term across all categories.
-        Dictionary<string, float> cumulativeInformation = new();
+        // Store the for each term across all categories.
+        Dictionary<string, ulong> rankings = new();
 
         // Load all files.
         foreach (string file in Directory.GetFiles(directory, "*.txt*", SearchOption.AllDirectories))
@@ -103,7 +103,7 @@ public static class MitigatedInformation
             {
                 if (terms.TryAdd(term, 1))
                 {
-                    cumulativeInformation.Add(term, 0);
+                    rankings.Add(term, 0);
                 }
                 else
                 {
@@ -140,7 +140,7 @@ public static class MitigatedInformation
         Dictionary<string, float> mitigatedInformation = new();
         
         // Calculate the mitigated information for each category.
-        int count = 0;
+        int count = 1;
         foreach (KeyValuePair<string, int> category in categories)
         {
             Console.WriteLine($"Calculating mitigated information for category {category.Key} | {count++} of {categories.Count}");
@@ -165,16 +165,17 @@ public static class MitigatedInformation
                                                    + Partial(total, n10, n00, n11)
                                                    + Partial(total, n01, n11, n00)
                                                    + Partial(total, n00, n10, n01));
-
-                // Add this mitigated information to the cumulative information.
-                cumulativeInformation[term.Key] += mitigatedInformation[term.Key];
             }
 
-            // Write the mitigated information for this class to a file from most important to least, breaking ties on lower term counts.
+            // Save the mitigated information for this class to a file from most important to least, breaking ties on lower term counts.
             sb.Clear();
             sb.Append("Term,Mitigated Information");
+            ulong index = 0;
             foreach (KeyValuePair<string, float> pair in mitigatedInformation.OrderByDescending(x => x.Value).ThenBy(x => terms[x.Key]).ThenBy(x => x.Key).ThenBy(x => termsInstances[x.Key]).ToDictionary())
             {
+                // The lower the index, the proportionally more important this term is.
+                rankings[pair.Key] += index + index;
+                index++;
                 sb.Append($"\n{pair.Key},{pair.Value}");
             }
             
@@ -186,18 +187,10 @@ public static class MitigatedInformation
         }
         
         // Sort the cumulative information by most important, breaking ties on lower term counts.
-        cumulativeInformation = cumulativeInformation.OrderByDescending(x => x.Value).ThenBy(x => terms[x.Key]).ThenBy(x => termsInstances[x.Key]).ToDictionary();
-
-        // Write the cumulative mitigated information to a file.
-        sb.Clear();
-        sb.Append("Term,Mitigated Information");
-        foreach (KeyValuePair<string, float> pair in cumulativeInformation)
-        {
-            sb.Append($"\n{pair.Key},{pair.Value}");
-        }
+        rankings = rankings.OrderBy(x => x.Value).ThenBy(x => terms[x.Key]).ThenBy(x => termsInstances[x.Key]).ToDictionary();
         
-        // Save to the file.
-        await File.WriteAllTextAsync(Path.Combine(Values.GetRootDirectory() ?? string.Empty, FileName), sb.ToString());
+        // Write the cumulative mitigated information to a file.
+        await File.WriteAllTextAsync(Path.Combine(Values.GetRootDirectory() ?? string.Empty, FileName), string.Join('\n', rankings.Keys));
 
         // If we are not discarding anything, return.
         if (discard <= 0)
@@ -206,9 +199,9 @@ public static class MitigatedInformation
         }
         
         // Save what to discard.
-        foreach (KeyValuePair<string, float> pair in cumulativeInformation.TakeLast((int) (cumulativeInformation.Count * discard)))
+        foreach (string term in rankings.TakeLast((int) (rankings.Count * discard)).Select(x => x.Key))
         {
-            Embeddings.DiscardTerms.Add(pair.Key);
+            Embeddings.DiscardTerms.Add(term);
         }
     }
 
@@ -233,21 +226,14 @@ public static class MitigatedInformation
         {
             return;
         }
-
-        Dictionary<string, float> loaded = new();
         
         // Load the mitigated information from the saved file.
         string[] lines = (await File.ReadAllTextAsync(file)).Split('\n');
-        for (int i = 1; i < lines.Length; i++)
-        {
-            string[] split = lines[i].Split(',');
-            loaded.Add(split[0], float.Parse(split[1]));
-        }
         
         // Save what to discard.
-        foreach (KeyValuePair<string, float> pair in loaded.TakeLast((int) (loaded.Count * discard)))
+        foreach (string term in lines.TakeLast((int) (lines.Length * discard)))
         {
-            Embeddings.DiscardTerms.Add(pair.Key);
+            Embeddings.DiscardTerms.Add(term);
         }
     }
 
