@@ -18,8 +18,9 @@ public static class Clustering
     /// Perform clustering.
     /// </summary>
     /// <param name="max">The maximum clustering value to perform up to.</param>
+    /// <param name="discard">What percentage of terms to discard.</param>
     /// <returns>The clustering results.</returns>
-    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int? max = null)
+    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int? max = null, float discard = 0)
     {
         // Ensure embeddings are loaded.
         Embeddings.LoadVectors();
@@ -27,7 +28,7 @@ public static class Clustering
         // Load mitigated information.
         if (Embeddings.DiscardTerms.Count < 1)
         {
-            await MitigatedInformation.Load();
+            await MitigatedInformation.Load(discard);
         }
         
         // Nothing to do if the folder does not exist.

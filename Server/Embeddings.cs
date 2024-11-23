@@ -462,7 +462,8 @@ public static partial class Embeddings
     /// <param name="reset">If we want to reset the vector database or not.</param>
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
     /// <param name="ranks">PageRank values.</param>
-    public static async Task Index(bool reset = false, double similarityThreshold = 1, Dictionary<string, double>? ranks = null)
+    /// <param name="discard">What percentage of terms to discard.</param>
+    public static async Task Index(bool reset = false, double similarityThreshold = 1, Dictionary<string, double>? ranks = null, float discard = 0)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -477,7 +478,7 @@ public static partial class Embeddings
         // Load mitigated information.
         if (DiscardTerms.Count < 1)
         {
-            await MitigatedInformation.Load();
+            await MitigatedInformation.Load(discard);
         }
 
         // Try and delete the vector database for a complete reset if we should.
@@ -616,8 +617,9 @@ public static partial class Embeddings
     /// <param name="attempts">The number of times to attempt spell correction.</param>
     /// <param name="alpha">Vector similarity weight.</param>
     /// <param name="beta">PageRank weight.</param>
+    /// <param name="discard">What percentage of terms to discard.</param>
     /// <returns>The results of the query.</returns>
-    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts, double alpha = Alpha, double beta = Beta)
+    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts, double alpha = Alpha, double beta = Beta, float discard = 0)
     {
         QueryResult result = new();
 
@@ -627,7 +629,7 @@ public static partial class Embeddings
         // Load mitigated information.
         if (DiscardTerms.Count < 1)
         {
-            await MitigatedInformation.Load();
+            await MitigatedInformation.Load(discard);
         }
         
         // If we are looking for similar documents, query by the ID.
