@@ -39,11 +39,16 @@ public static partial class Embeddings
     /// Key for the updated time.
     /// </summary>
     private const string UpdatedKey = "updated";
+    
+    /// <summary>
+    /// Key for the custom scores.
+    /// </summary>
+    private const string ScoreKey = "score";
 
     /// <summary>
     /// The preprocessed directory.
     /// </summary>
-    private const string Processed = "_processed";
+    public const string Processed = "_processed";
 
     /// <summary>
     /// The name of the custom stems file.
@@ -74,6 +79,16 @@ public static partial class Embeddings
     /// The number of times to attempt spell correction.
     /// </summary>
     private const int Attempts = 5;
+
+    /// <summary>
+    /// Vector similarity weight.
+    /// </summary>
+    private const double Alpha = 1;
+
+    /// <summary>
+    /// PageRank weight.
+    /// </summary>
+    private const double Beta = 1;
 
     /// <summary>
     /// Spell checking affinity file.
@@ -117,6 +132,11 @@ public static partial class Embeddings
     private static readonly EnglishPorter2Stemmer Stemmer = new();
 
     /// <summary>
+    /// The mitigated information to discard.
+    /// </summary>
+    public static readonly HashSet<string> DiscardTerms = [];
+
+    /// <summary>
     /// The word2vec generated vectors.
     /// </summary>
     private static readonly Dictionary<string, float[]> Vectors = new();
@@ -134,7 +154,7 @@ public static partial class Embeddings
     /// <summary>
     /// Load all vectors.
     /// </summary>
-    private static void LoadVectors()
+    public static void LoadVectors()
     {
         // If already loaded, there is nothing to do.
         if (Vectors.Count > 0)
@@ -169,7 +189,7 @@ public static partial class Embeddings
     /// </summary>
     /// <param name="text">The text to get the embeddings of.</param>
     /// <returns>The embeddings.</returns>
-    private static float[] GetEmbeddings(string text)
+    public static float[] GetEmbeddings(string text)
     {
         return GetEmbeddings(text, out int _);
     }
@@ -180,7 +200,7 @@ public static partial class Embeddings
     /// <param name="text">The text to get the embeddings of.</param>
     /// <param name="size">The number of words which matched embeddings.</param>
     /// <returns>The embeddings.</returns>
-    private static float[] GetEmbeddings(string text, out int size)
+    public static float[] GetEmbeddings(string text, out int size)
     {
         // Define the vector.
         size = 0;
@@ -289,8 +309,9 @@ public static partial class Embeddings
     /// Preprocess a string for indexing.
     /// </summary>
     /// <param name="s">The string to preprocess.</param>
+    /// <param name="mitigate">If we should remove mitigated information or not.</param>
     /// <returns>The preprocessed string.</returns>
-    private static string Preprocess(string s)
+    public static string Preprocess(string s, bool mitigate = false)
     {
         // Ensure mappings are loaded.
         LoadMappings();
@@ -348,10 +369,17 @@ public static partial class Embeddings
         foreach (string term in terms)
         {
             // Do not add stop words.
-            if (!StopWords.Contains(term))
+            if (StopWords.Contains(term))
             {
-                // Run our custom stemming followed by a porter stemming.
-                Builder.Append(' ').Append(Stemmer.Stem(Stems.FirstOrDefault(x => term.StartsWith(x)) ?? term).Value);
+                continue;
+            }
+
+            // Run our custom stemming followed by a porter stemming.
+            string final = Stemmer.Stem(Stems.FirstOrDefault(x => term.StartsWith(x)) ?? term).Value;
+
+            if (!mitigate || !DiscardTerms.Contains(final))
+            {
+                Builder.Append(' ').Append(final);
             }
         }
 
@@ -363,8 +391,9 @@ public static partial class Embeddings
 
     /// <summary>
     /// Preprocess all documents.
+    /// <param name="mitigate">If we should remove mitigated information or not.</param>
     /// </summary>
-    public static async Task Preprocess()
+    public static async Task Preprocess(bool mitigate = false)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -373,10 +402,15 @@ public static partial class Embeddings
             return;
         }
 
-        string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
+        string[] files = Directory.GetFiles(directory, "*.txt*", SearchOption.AllDirectories);
 
         // Get the directory that summaries could be in.
         string processedDirectory = $"{directory}{Processed}";
+        if (mitigate)
+        {
+            processedDirectory += MitigatedInformation.Folder;
+        }
+        
         if (!Directory.Exists(processedDirectory))
         {
             Directory.CreateDirectory(processedDirectory);
@@ -384,7 +418,7 @@ public static partial class Embeddings
 
         // See how many documents already exist.
         HashSet<string> allFiles = [];
-        foreach (string s in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
+        foreach (string s in Directory.GetFiles(processedDirectory, "*.txt*", SearchOption.AllDirectories))
         {
             allFiles.Add(Path.GetFileNameWithoutExtension(s));
         }
@@ -392,7 +426,10 @@ public static partial class Embeddings
         // Iterate over all files in our dataset.
         for (int i = 0; i < files.Length; i++)
         {
-            Console.WriteLine($"Preprocessing file {i + 1} of {files.Length}");
+            Console.WriteLine(mitigate
+                ? $"Preprocessing with mitigation file {i + 1} of {files.Length}"
+                : $"Preprocessing file {i + 1} of {files.Length}");
+
 
             // The ID is the file name.
             string id = Path.GetFileNameWithoutExtension(files[i]);
@@ -413,7 +450,8 @@ public static partial class Embeddings
             {
                 Directory.CreateDirectory(categoryPath);
             }
-            await File.WriteAllTextAsync(Path.Combine(processedDirectory, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}"));
+            
+            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), Preprocess($"{file[0]} {file[1]}", mitigate));
             allFiles.Add(id);
         }
     }
@@ -421,11 +459,15 @@ public static partial class Embeddings
     /// <summary>
     /// Perform indexing.
     /// </summary>
-    public static async Task Index()
+    /// <param name="reset">If we want to reset the vector database or not.</param>
+    /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
+    /// <param name="ranks">PageRank values.</param>
+    /// <param name="discard">What percentage of terms to discard.</param>
+    public static async Task Index(bool reset = false, double similarityThreshold = 1, Dictionary<string, double>? ranks = null, float discard = 0)
     {
         // Get all files.
         string directory = Values.GetDataset;
-        if (!Directory.Exists(Values.GetDataset))
+        if (!Directory.Exists(directory))
         {
             return;
         }
@@ -433,15 +475,25 @@ public static partial class Embeddings
         // Ensure our vector mappings are loaded.
         LoadVectors();
 
-        // If we cannot delete the vector embeddings, assume we just have not made them yet.
-        // If it was an error, our next creating line will catch it.
-        try
+        // Load mitigated information.
+        if (DiscardTerms.Count < 1)
         {
-            await VectorDatabase.DeleteCollectionAsync(VectorCollectionName);
+            await MitigatedInformation.Load(discard);
         }
-        catch
+
+        // Try and delete the vector database for a complete reset if we should.
+        if (reset)
         {
-            // Ignored.
+            // If we cannot delete the vector embeddings, assume we just have not made them yet.
+            // If it was an error, our next creating line will catch it.
+            try
+            {
+                await VectorDatabase.DeleteCollectionAsync(VectorCollectionName);
+            }
+            catch
+            {
+                // Ignored.
+            }
         }
 
         // Create our vector database.
@@ -449,10 +501,9 @@ public static partial class Embeddings
         {
             await VectorDatabase.CreateCollectionAsync(VectorCollectionName, new VectorParams { Size = _vectorSize, Distance = Distance.Cosine });
         }
-        catch (Exception e)
+        catch
         {
-            Console.Error.WriteLine(e);
-            return;
+            // Ignored as it may already exist.
         }
 
         // Get existing summaries.
@@ -460,26 +511,26 @@ public static partial class Embeddings
         Dictionary<string, string> summaries = [];
         if (Directory.Exists(summariesDirectory))
         {
-            foreach (string file in Directory.GetFiles(summariesDirectory, "*.*", SearchOption.AllDirectories))
+            foreach (string file in Directory.GetFiles(summariesDirectory, "*.txt*", SearchOption.AllDirectories))
             {
                 summaries.Add(Path.GetFileNameWithoutExtension(file), file);
             }
         }
 
         // Get existing preprocessed contents.
-        string processedDirectory = $"{directory}{Processed}";
+        string processedDirectory = $"{directory}{Processed}{MitigatedInformation.Folder}";
         Dictionary<string, string> processed = [];
         if (Directory.Exists(processedDirectory))
         {
-            foreach (string file in Directory.GetFiles(processedDirectory, "*.*", SearchOption.AllDirectories))
+            foreach (string file in Directory.GetFiles(processedDirectory, "*.txt*", SearchOption.AllDirectories))
             {
                 processed.Add(Path.GetFileNameWithoutExtension(file), file);
             }
         }
 
         // Iterate over all files in our dataset.
-        string[] files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories);
-        PointStruct[] points = new PointStruct[files.Length];
+        string[] files = Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories);
+        List<PointStruct> points = [];
         for (int i = 0; i < files.Length; i++)
         {
             Console.WriteLine($"Indexing file {i + 1} of {files.Length}");
@@ -488,31 +539,66 @@ public static partial class Embeddings
             string id = Path.GetFileNameWithoutExtension(files[i]);
 
             // Read the current file.
-            string[] file = (await File.ReadAllTextAsync(files[i])).Split("\n");
+            string[] file = (await File.ReadAllTextAsync(files[i])).Split('\n');
 
-            // Index the authors formatted nicely.
-            string authors = file.Length > 3 ? file[3] : string.Empty;
-            for (int j = 4; j < file.Length; j++)
+            // See if we have already preprocessed the contents. Otherwise, preprocess it now.
+            float[] embeddings = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}", true));
+
+            Guid? guid = null;
+            
+            try
             {
-                authors += $"|{file[j]}";
+                // See if there is a similar file.
+                IReadOnlyList<ScoredPoint> existing = await VectorDatabase.QueryAsync(VectorCollectionName, new(embeddings), limit: 1);
+
+                if (existing.Count > 0)
+                {
+                    // If it is the same file, no reason to index it again.
+                    if (guid.HasValue && existing[0].Payload[IdKey].StringValue == id)
+                    {
+                        guid = Guid.Parse(existing[0].Id.Uuid);
+                    }
+
+                    // If the document is similar enough, skip it.
+                    else if (existing[0].Score >= similarityThreshold)
+                    {
+                        continue;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                await Console.Error.WriteLineAsync($"Search for existing document failed: {e}");
+                break;
             }
 
-            points[i] = new()
+            // Create a new ID if one did not exist.
+            guid ??= Guid.NewGuid();
+
+            points.Add(new()
             {
-                Id = (ulong)i,
+                Id = guid,
                 // See if we have already preprocessed the contents. Otherwise, preprocess it now.
-                Vectors = GetEmbeddings(processed.TryGetValue(id, out string? p) ? await File.ReadAllTextAsync(p) : Preprocess($"{file[0]} {file[1]}")),
+                Vectors = GetEmbeddings(processed.TryGetValue(id, out string? q) ? await File.ReadAllTextAsync(q) : Preprocess($"{file[0]} {file[1]}")),
                 Payload = {
                     [IdKey] = id,
                     [TitleKey] = file[0],
                     // Try and load the LLM summary if it exists.
                     [SummaryKey] = summaries.TryGetValue(id, out string? s) ? await File.ReadAllTextAsync(s) : file[1],
                     [UpdatedKey] = file[2],
-                    [AuthorsKey] = authors
+                    [AuthorsKey] = file[3],
+                    // Add the PageRank score.
+                    [ScoreKey] = ranks == null || !ranks.TryGetValue(id, out double rank) ? 0 : rank
                 }
-            };
+            });
         }
 
+        // Nothing to do if no changes.
+        if (points.Count < 1)
+        {
+            return;
+        }
+        
         // Update our values into the vector database.
         UpdateResult updateResult = await VectorDatabase.UpsertAsync(VectorCollectionName, points);
         if (updateResult.Status != UpdateStatus.Completed)
@@ -529,26 +615,34 @@ public static partial class Embeddings
     /// <param name="start">The starting search index.</param>
     /// <param name="count">The number of documents to retrieve at most.</param>
     /// <param name="attempts">The number of times to attempt spell correction.</param>
+    /// <param name="alpha">Vector similarity weight.</param>
+    /// <param name="beta">PageRank weight.</param>
+    /// <param name="discard">What percentage of terms to discard.</param>
     /// <returns>The results of the query.</returns>
-    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts)
+    public static async Task<QueryResult> Search(string? queryString = null, string? id = null, int start = 0, int count = Values.SearchCount, int attempts = Attempts, double alpha = Alpha, double beta = Beta, float discard = 0)
     {
         QueryResult result = new();
 
         // Ensure our vector embeddings are loaded.
         LoadVectors();
 
-        Query query;
-
+        // Load mitigated information.
+        if (DiscardTerms.Count < 1)
+        {
+            await MitigatedInformation.Load(discard);
+        }
+        
         // If we are looking for similar documents, query by the ID.
+        Query query;
         if (id != null)
         {
-            query = ulong.Parse(id);
+            query = Guid.Parse(id);
         }
 
         // Otherwise, compute based on the query string.
         else
         {
-            float[] vectors = GetEmbeddings(Preprocess(queryString ?? string.Empty), out int size);
+            float[] vectors = GetEmbeddings(Preprocess(queryString ?? string.Empty, true), out int size);
 
             // If there was no matching vectors and the query string was not empty, attempt spelling correction.
             if (size < 1 && !string.IsNullOrWhiteSpace(queryString))
@@ -587,7 +681,7 @@ public static partial class Embeddings
 
                     // Built the corrected string.
                     string raw = string.Join(" ", words);
-                    string correctedQuery = Preprocess(raw);
+                    string correctedQuery = Preprocess(raw, true);
 
                     // If the strings are equal, there is nothing else to change.
                     if (queryString == correctedQuery)
@@ -598,9 +692,9 @@ public static partial class Embeddings
                     // Otherwise, see if there is any improvements with the vector embeddings.
                     queryString = correctedQuery;
                     result.CorrectedQuery = raw;
-                    vectors = GetEmbeddings(Preprocess(queryString), out size);
+                    vectors = GetEmbeddings(Preprocess(queryString, true), out size);
 
-                    // If there was at least one matching vector, we are ready to query..
+                    // If there was at least one matching vector, we are ready to query.
                     if (size > 0)
                     {
                         break;
@@ -625,13 +719,21 @@ public static partial class Embeddings
         // Run the query.
         try
         {
-            IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, limit: (ulong)(start + count));
-            int number = Math.Min(count, points.Count - start);
-            for (int i = 0; i < number; i++)
+            // Get the given batch of points.
+            IReadOnlyList<ScoredPoint> points = await VectorDatabase.QueryAsync(VectorCollectionName, query, offset: (ulong) start, limit: (ulong) count);
+            
+            // This local batch of points is then sorted by a weighted score taking into account PageRank results.
+            foreach (ScoredPoint point in points.OrderByDescending(x => ScoreResult(x, alpha, beta)).ThenByDescending(x => x.Payload[UpdatedKey].StringValue).ThenBy(x => x.Payload[TitleKey].StringValue))
             {
+                // If this was the field searched for during similar searching, ignore it.
+                if (id != null && id == point.Id.Uuid)
+                {
+                    continue;
+                }
+                
                 // Build the authors.
                 List<string> authors = [];
-                string rawAuthors = points[i].Payload[AuthorsKey].StringValue;
+                string rawAuthors = point.Payload[AuthorsKey].StringValue;
                 if (rawAuthors != null)
                 {
                     authors.AddRange(rawAuthors.Split('|'));
@@ -640,12 +742,12 @@ public static partial class Embeddings
                 // Add the document.
                 result.SearchDocuments.Add(new()
                 {
-                    IndexId = points[i].Id.Num,
-                    ArXivId = points[i].Payload[IdKey].StringValue,
-                    Title = points[i].Payload[TitleKey].StringValue,
-                    Summary = points[i].Payload[SummaryKey].StringValue,
+                    IndexId = point.Id.Uuid,
+                    ArXivId = point.Payload[IdKey].StringValue,
+                    Title = point.Payload[TitleKey].StringValue,
+                    Summary = point.Payload[SummaryKey].StringValue,
                     Authors = authors.ToArray(),
-                    Updated = DateTime.Parse(points[i].Payload[UpdatedKey].StringValue)
+                    Updated = DateTime.Parse(point.Payload[UpdatedKey].StringValue)
                 });
             }
         }
@@ -655,6 +757,18 @@ public static partial class Embeddings
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Score how well a matched point is by factoring in the PageRank score.
+    /// </summary>
+    /// <param name="point">The point.</param>
+    /// <param name="alpha">Vector similarity weight.</param>
+    /// <param name="beta">PageRank weight.</param>
+    /// <returns>The score.</returns>
+    private static double ScoreResult(ScoredPoint point, double alpha = Alpha, double beta = Beta)
+    {
+        return alpha * point.Score + beta * point.Payload[ScoreKey].DoubleValue;
     }
 
     /// <summary>
