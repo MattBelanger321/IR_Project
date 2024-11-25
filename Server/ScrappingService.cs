@@ -9,11 +9,6 @@ namespace SearchEngine.Server;
 public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundService
 {
     /// <summary>
-    /// The amount of results we want to get with the service.
-    /// </summary>
-    private const int Amount = 1000;
-
-    /// <summary>
     /// The similarity threshold.
     /// </summary>
     private const double SimilarityThreshold = 0.95;
@@ -46,7 +41,7 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
                 }
 
                 // Run the scrapping for more files.
-                await Scrape(Amount, allFiles.Count + Amount);
+                await Scrape(allFiles.Count + ArXiv.MaxResults);
 
                 logger.LogInformation("Scrapping finished, restarting...");
             }
@@ -62,7 +57,6 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <summary>
     /// Perform scrapping of arXiv data.
     /// </summary>
-    /// <param name="maxResults">The maximum number of results to get from arXiv at once.</param>
     /// <param name="totalResults">The total number of results we want for our own database.</param>
     /// <param name="discard">What percentage of terms to discard.</param>
     /// <param name="dampingFactor">The PageRank dampening factor.</param>
@@ -74,10 +68,10 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="mitigate">If we should run mitigation.</param>
     /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
-    public static async Task Scrape(int maxResults = Amount, int totalResults = Amount, float discard = 0, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool mitigate = true, bool cluster = true, bool rank = true)
+    public static async Task Scrape(int totalResults = ArXiv.TotalResults, float discard = 0, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool mitigate = true, bool cluster = true, bool rank = true)
     {
         // Get all the documents to build our dataset.
-        await ArXiv.Scrape(maxResults: maxResults, totalResults: totalResults);
+        await ArXiv.Scrape(totalResults: totalResults);
 
         // Process all documents.
         await Embeddings.Preprocess();
