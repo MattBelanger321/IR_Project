@@ -17,10 +17,11 @@ public static class Clustering
     /// <summary>
     /// Perform clustering.
     /// </summary>
+    /// <param name="min">The minimum clustering value to perform up from.</param>
     /// <param name="max">The maximum clustering value to perform up to.</param>
     /// <param name="discard">What percentage of terms to discard.</param>
     /// <returns>The clustering results.</returns>
-    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int? max = null, float discard = 0)
+    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int min = 5, int? max = 5, float discard = 0)
     {
         // Ensure embeddings are loaded.
         Embeddings.LoadVectors();
@@ -84,8 +85,13 @@ public static class Clustering
         // Store all results to return.
         Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
 
+        if (min < 2)
+        {
+            min = 2;
+        }
+
         // Loop from two clusters up to the maximum amount.
-        for (int n = 2; n <= max; n++)
+        for (int n = min; n <= max; n++)
         {
             Console.WriteLine($"Performing {n}-Means of {max}-Means clustering.");
 

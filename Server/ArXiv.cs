@@ -125,6 +125,8 @@ public static partial class ArXiv
     /// <param name="startingBy">What direction to start with.</param>
     public static async Task Scrape(int totalResults = TotalResults, string? startingCategory = null, string? startingOrder = null, string? startingBy = null)
     {
+        Console.WriteLine("Loading data to download from arXiv...");
+        
         // Ensure valid values.
         if (totalResults < 1)
         {
@@ -371,13 +373,17 @@ public static partial class ArXiv
                 }
             }
 
-            // For the next query, index the next possible documents after those which were returned.
-            startIndex += returned.Length;
-            
-            // If we have reached the maximum amount the API can give us for this query, change the query.
-            if (startIndex < Math.Min(possible, PerCategory))
+            // For other orderings, if we know we have already gotten all possible files, just skip to the next category.
+            if (sortOrderIndex < 1 || possible > PerCategory)
             {
-                continue;
+                // For the next query, index the next possible documents after those which were returned.
+                startIndex += returned.Length;
+            
+                // If we have reached the maximum amount the API can give us for this query, change the query.
+                if (startIndex < Math.Min(possible, PerCategory))
+                {
+                    continue;
+                }
             }
 
             // Try going to the next category.

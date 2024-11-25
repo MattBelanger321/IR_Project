@@ -1,10 +1,14 @@
+using SearchEngine.Server;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // Service to automatically scrape more data.
-// TODO - Make this run based off a command link argument.
-//builder.Services.AddHostedService<ScrappingService>();
+if (builder.Configuration.GetValue<bool>("Service"))
+{
+    builder.Services.AddHostedService<ScrappingService>();
+}
 
 WebApplication app = builder.Build();
 

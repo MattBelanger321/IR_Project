@@ -60,6 +60,7 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="totalResults">The total number of results we want for our own database.</param>
     /// <param name="discard">What percentage of terms to discard.</param>
     /// <param name="dampingFactor">The PageRank dampening factor.</param>
+    /// <param name="min">The minimum clustering value to perform up from.</param>
     /// <param name="max">The maximum clustering value to perform up to.</param>
     /// <param name="iterations">The max number of PageRank iterations.</param>
     /// <param name="tolerance">The PageRank tolerance to stop at.</param>
@@ -68,10 +69,13 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="mitigate">If we should run mitigation.</param>
     /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
-    public static async Task Scrape(int totalResults = ArXiv.TotalResults, float discard = 0, double dampingFactor = PageRank.DampingFactor, int? max = null, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool mitigate = true, bool cluster = true, bool rank = true)
+    /// <param name="startingCategory">What category to start with.</param>
+    /// <param name="startingOrder">What ordering to start with.</param>
+    /// <param name="startingBy">What direction to start with.</param>
+    public static async Task Scrape(int totalResults = ArXiv.TotalResults, float discard = 0, double dampingFactor = PageRank.DampingFactor, int min = 5, int? max = 5, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double similarityThreshold = SimilarityThreshold, bool mitigate = true, bool cluster = true, bool rank = true, string? startingCategory = null, string? startingOrder = null, string? startingBy = null)
     {
         // Get all the documents to build our dataset.
-        await ArXiv.Scrape(totalResults: totalResults);
+        await ArXiv.Scrape(totalResults, startingCategory, startingOrder, startingBy);
 
         // Process all documents.
         await Embeddings.Preprocess();
@@ -86,7 +90,7 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
         await Embeddings.Preprocess(true);
 
         // Perform clustering.
-        Dictionary<int, Dictionary<int, HashSet<string>>> clusters = cluster ? await Clustering.Perform(max) : await Clustering.Load();
+        Dictionary<int, Dictionary<int, HashSet<string>>> clusters = cluster ? await Clustering.Perform(min, max) : await Clustering.Load();
 
         // Perform PageRank.
         Dictionary<string, double> ranks = rank ? await PageRank.Perform(dampingFactor, iterations, tolerance, clusters) : await PageRank.Load();

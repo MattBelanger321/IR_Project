@@ -43,7 +43,7 @@
 ## Serving
 
 1. Launch [Qdrant](https://github.com/qdrant/qdrant "Qdrant") with [Docker](https://www.docker.com) with ``docker run -p 6334:6334 qdrant/qdrant``.
-2. Run ``Server: IIS Express`` or ``Server``.
+2. Run ``Server``.
 
 # Project Structure
 
@@ -65,9 +65,10 @@ This will handle one-time building and indexing of the dataset from [arXiv](http
 
 - Holds the common data structure for passing data between the other projects.
 
-## word2vec - Python
+## Python Files
 
 - Generates vector embeddings with word2vec.
+- These also handle other visualization and helper methods.
 
 # [arXiv](https://arxiv.org "arXiv") Data Format
 
