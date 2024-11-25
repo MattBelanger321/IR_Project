@@ -108,6 +108,7 @@ public static class Clustering
 
         // Store all results to return.
         Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
+        Dictionary<int, double> errors = new();
 
         // Loop from two clusters up to the maximum amount.
         for (int n = min; n <= max; n++)
@@ -115,7 +116,9 @@ public static class Clustering
             Console.WriteLine($"Performing {n}-Means of {max}-Means clustering.");
 
             // Compute the clusters.
-            KMeansClusterCollection clusters = new KMeans(n).Learn(trainingSet);
+            KMeans kMeans = new(n);
+            KMeansClusterCollection clusters = kMeans.Learn(trainingSet);
+            errors.Add(n, kMeans.Error);
 
             // Store the results for this cluster.
             Dictionary<int, HashSet<string>> result = new();
@@ -149,6 +152,14 @@ public static class Clustering
             // Save the output.
             await File.WriteAllTextAsync(Path.Combine(clusteringDirectory, $"{n}.csv"), sb.ToString());
         }
+
+        StringBuilder errorBuilder = new("K,Error");
+        foreach (KeyValuePair<int, double> error in errors)
+        {
+            errorBuilder.Append($"\n{error.Key},{error.Value}");
+        }
+        
+        await File.WriteAllTextAsync(Path.Combine(Values.GetRootDirectory() ?? string.Empty, "clustering.csv"), errorBuilder.ToString());
         
         // Return the results of the clustering.
         return results;
