@@ -463,7 +463,7 @@ public static partial class Embeddings
     /// <param name="similarityThreshold">How close documents must be for us to discard them.</param>
     /// <param name="ranks">PageRank values.</param>
     /// <param name="discard">What percentage of terms to discard.</param>
-    public static async Task Index(bool reset = false, double similarityThreshold = 1, Dictionary<string, double>? ranks = null, float discard = 0)
+    public static async Task Index(bool reset = false, double? similarityThreshold = null, Dictionary<string, double>? ranks = null, float discard = 0)
     {
         // Get all files.
         string directory = Values.GetDataset;
@@ -560,7 +560,7 @@ public static partial class Embeddings
                     }
 
                     // If the document is similar enough, skip it.
-                    else if (existing[0].Score >= similarityThreshold)
+                    else if (similarityThreshold.HasValue && existing[0].Score >= similarityThreshold)
                     {
                         continue;
                     }

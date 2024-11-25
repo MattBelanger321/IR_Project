@@ -19,9 +19,10 @@ public static class Clustering
     /// </summary>
     /// <param name="min">The minimum clustering value to perform up from.</param>
     /// <param name="max">The maximum clustering value to perform up to.</param>
+    /// <param name="training">The percentage of data to use for training.</param>
     /// <param name="discard">What percentage of terms to discard.</param>
     /// <returns>The clustering results.</returns>
-    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int min = 5, int? max = 5, float discard = 0)
+    public static async Task<Dictionary<int, Dictionary<int, HashSet<string>>>> Perform(int min = 5, int? max = 5, float training = 0.1f, float discard = 0)
     {
         // Ensure embeddings are loaded.
         Embeddings.LoadVectors();
@@ -60,20 +61,43 @@ public static class Clustering
             embeddings.Add(Path.GetFileNameWithoutExtension(file), doubleVector);
         }
 
-        // Insert all embeddings into an array for passing to the model.
-        double[][] vectors = new double[embeddings.Count][];
-        int index = 0;
-        foreach (double[] vector in embeddings.Values)
+        // Can't do anything if only a single document.
+        if (embeddings.Count < 2)
         {
-            vectors[index++] = vector;
+            return [];
         }
 
-        // Ensure the max we go up to is the root of the files.
-        int root = (int) Math.Floor(Math.Sqrt(embeddings.Count));
-        if (max == null || max > root)
+        // Ensure a valid training size.
+        if (training is <= 0 or > 1)
         {
-            max = root;
+            training = 1;
         }
+        
+        // Get how many samples to use for training.
+        int trainingSamples = Math.Min(2, (int) (embeddings.Count * training));
+
+        // If a max value is not passed, use the root.
+        max ??= (int)Math.Floor(Math.Sqrt(embeddings.Count));
+        
+        // We cannot have more clusters than there are elements.
+        if (max > trainingSamples)
+        {
+            max = trainingSamples;
+        }
+        
+        if (min > trainingSamples)
+        {
+            min = trainingSamples;
+        }
+
+        // Ensure at least two clusters, otherwise this is pointless.
+        if (min < 2)
+        {
+            min = 2;
+        }
+
+        // Get the training vectors.
+        double[][] trainingSet = Random.Shared.GetItems(embeddings.Values.ToArray(), trainingSamples);
         
         // Ensure the directory to save the clusters exists.
         string clusteringDirectory = $"{directory}{Folder}";
@@ -85,18 +109,13 @@ public static class Clustering
         // Store all results to return.
         Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
 
-        if (min < 2)
-        {
-            min = 2;
-        }
-
         // Loop from two clusters up to the maximum amount.
         for (int n = min; n <= max; n++)
         {
             Console.WriteLine($"Performing {n}-Means of {max}-Means clustering.");
 
             // Compute the clusters.
-            KMeansClusterCollection clusters = new KMeans(n).Learn(vectors);
+            KMeansClusterCollection clusters = new KMeans(n).Learn(trainingSet);
 
             // Store the results for this cluster.
             Dictionary<int, HashSet<string>> result = new();
@@ -152,7 +171,7 @@ public static class Clustering
         Dictionary<int, Dictionary<int, HashSet<string>>> results = new();
 
         // Check every existing cluster.
-        foreach (string file in Directory.GetFiles(directory, "*.csv*", SearchOption.AllDirectories))
+        foreach (string file in Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories))
         {
             // Load the contents of the CSV file.
             string[] line = (await File.ReadAllTextAsync(file)).Split('\n');
