@@ -374,7 +374,7 @@ public static partial class ArXiv
             }
 
             // For other orderings, if we know we have already gotten all possible files, just skip to the next category.
-            if (sortOrderIndex < 1 || possible > PerCategory)
+            if (sortOrderIndex + sortByIndex < 1 || possible > PerCategory)
             {
                 // For the next query, index the next possible documents after those which were returned.
                 startIndex += returned.Length;
