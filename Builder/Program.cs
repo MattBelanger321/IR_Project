@@ -4,6 +4,9 @@
 int totalResults = 5000000;
 int min = 5;
 int max = 5;
+bool mitigate = true;
+bool cluster = true;
+bool rank = true;
 bool reset = true;
 string? startingCategory = null;
 string? startingOrder = null;
@@ -27,10 +30,28 @@ if (args.Length > 2 && int.TryParse(args[2], out temp))
     max = Math.Max(temp, min);
 }
 
+// Try and get if we should perform mitigation.
+if (args.Length > 3)
+{
+    _ = bool.TryParse(args[3], out mitigate);
+}
+
+// Try and get if we should perform clustering.
+if (args.Length > 4)
+{
+    _ = bool.TryParse(args[4], out cluster);
+}
+
+// Try and get if we should perform PageRank.
+if (args.Length > 4)
+{
+    _ = bool.TryParse(args[4], out rank);
+}
+
 // Try and get if we should reset the entire database.
 if (args.Length > 3)
 {
-    _ = bool.TryParse(args[3], out reset);
+    _ = bool.TryParse(args[4], out reset);
 }
 
 // Try and get the category we should start searching from.
@@ -52,4 +73,4 @@ if (args.Length > 6)
 }
 
 // Run everything from scraping to indexing.
-await ScrappingService.Scrape(totalResults:totalResults, min:min, max:max, reset:reset, startingCategory:startingCategory, startingOrder:startingOrder, startingBy:startingBy);
+await ScrappingService.Scrape(totalResults:totalResults, min:min, max:max, mitigate:mitigate, cluster:cluster, rank:rank, reset:reset, startingCategory:startingCategory, startingOrder:startingOrder, startingBy:startingBy);
