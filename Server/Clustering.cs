@@ -74,10 +74,10 @@ public static class Clustering
         }
         
         // Get how many samples to use for training.
-        int trainingSamples = Math.Min(2, (int) (embeddings.Count * training));
+        int trainingSamples = Math.Max(2, (int) (embeddings.Count * training));
 
         // If a max value is not passed, use the root.
-        max ??= (int)Math.Floor(Math.Sqrt(embeddings.Count));
+        max ??= (int) Math.Floor(Math.Sqrt(embeddings.Count));
         
         // We cannot have more clusters than there are elements.
         if (max > trainingSamples)
