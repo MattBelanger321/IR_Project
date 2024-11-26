@@ -7,6 +7,8 @@ int max = 5;
 bool mitigate = true;
 bool cluster = true;
 bool rank = true;
+bool summarize = true;
+bool index = true;
 bool reset = true;
 string? startingCategory = null;
 string? startingOrder = null;
@@ -43,34 +45,46 @@ if (args.Length > 4)
 }
 
 // Try and get if we should perform PageRank.
-if (args.Length > 4)
+if (args.Length > 5)
 {
-    _ = bool.TryParse(args[4], out rank);
+    _ = bool.TryParse(args[5], out rank);
+}
+
+// Try and get if we should perform summarizing.
+if (args.Length > 6)
+{
+    _ = bool.TryParse(args[6], out rank);
+}
+
+// Try and get if we should perform indexing.
+if (args.Length > 7)
+{
+    _ = bool.TryParse(args[7], out rank);
 }
 
 // Try and get if we should reset the entire database.
-if (args.Length > 3)
+if (args.Length > 8)
 {
-    _ = bool.TryParse(args[4], out reset);
+    _ = bool.TryParse(args[8], out reset);
 }
 
 // Try and get the category we should start searching from.
-if (args.Length > 4)
+if (args.Length > 9)
 {
-    startingCategory = args[4];
+    startingCategory = args[9];
 }
 
 // Try and get the ordering mode for searching.
-if (args.Length > 5)
+if (args.Length > 10)
 {
-    startingOrder = args[5];
+    startingOrder = args[10];
 }
 
 // Try and get the sorting by mode for searching.
-if (args.Length > 6)
+if (args.Length > 11)
 {
-    startingBy = args[6];
+    startingBy = args[11];
 }
 
 // Run everything from scraping to indexing.
-await ScrappingService.Scrape(totalResults:totalResults, min:min, max:max, mitigate:mitigate, cluster:cluster, rank:rank, reset:reset, startingCategory:startingCategory, startingOrder:startingOrder, startingBy:startingBy);
+await ScrappingService.Scrape(totalResults:totalResults, min:min, max:max, mitigate:mitigate, cluster:cluster, rank:rank, summarize:summarize, index:index, reset:reset, startingCategory:startingCategory, startingOrder:startingOrder, startingBy:startingBy);
