@@ -65,26 +65,6 @@ def get_model(corpus, model_path, fit_model_flag):
             logging.warning("No saved model found. Use --fit_model to train a new model.")
             return None
 
-def process_category_model(category, fit_model_flag, output_root_path):
-    """Processes a category to fit a Word2Vec model and save embeddings."""
-    category_path = os.path.join(os.getcwd(), "arXiv_processed", category)
-    logging.info(f"Processing category: {category}")
-
-    # Load corpus for the category
-    category_corpus = load_corpus(category_path)
-
-    # Check if corpus is empty
-    if not check_corpus(category_corpus):
-        return
-
-    category_model_path = os.path.join(output_root_path, category, "word2vec.model")
-    os.makedirs(os.path.dirname(category_model_path), exist_ok=True)
-
-    # Get the model for the category
-    category_model = get_model(category_corpus, category_model_path, fit_model_flag)
-    if category_model is not None:
-        save_embeddings(category_model, os.path.join(output_root_path, category, "embeddings.txt"))
-
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Fit a Word2Vec model on a corpus.")
@@ -92,7 +72,7 @@ def main():
     args = parser.parse_args()
 
     # Define paths
-    root_dir = os.path.join(os.getcwd(), "arXiv_processed")
+    root_dir = os.path.join(os.getcwd(), "arXiv_processed_mitigated")
     big_model_path = os.path.join(os.getcwd(), "word2vec_embeddings", "word2vec.model")
     output_root_path = os.path.join(os.getcwd(), "word2vec_embeddings")
 
@@ -113,11 +93,6 @@ def main():
 
     # Save the embeddings from the big model
     save_embeddings(big_model, os.path.join(output_root_path, "embeddings.txt"))
-
-    # Process each category
-    for category in os.listdir(root_dir):
-        if os.path.isdir(os.path.join(root_dir, category)):
-            process_category_model(category, args.fit_model, output_root_path)
 
     logging.info("Process completed successfully.")
 

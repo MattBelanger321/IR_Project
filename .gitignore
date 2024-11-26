@@ -419,6 +419,13 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Python Virtual Environment
+venv/
+
+# VS Code Cache
+.vscode/
+*.png
+
 # Do not keep the arXiv data.
 arXiv/
 arXiv_summaries/
@@ -429,10 +436,6 @@ arXiv_mitigated/
 page_rank.csv
 clustering.csv
 mitigated.txt
-
-# Python Virtual Environment
-venv/
-
-# VS Code Cache
-.vscode/
-*.png
+embeddings.txt
+word2vec_embeddings/
+bert_embeddings/

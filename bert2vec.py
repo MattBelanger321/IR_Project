@@ -105,33 +105,6 @@ def save_embeddings(embeddings, output_path, words=None):
     
     logging.info(f"Embeddings saved to: {output_path}")
 
-def process_category_embeddings(category, model, tokenizer, output_root_path):
-    """
-    Process embeddings for a specific category.
-    
-    Args:
-        category (str): Category name
-        model (BertModel): Pretrained BERT model
-        tokenizer (BertTokenizer): BERT tokenizer
-        output_root_path (str): Root path for output
-    """
-    category_path = os.path.join(os.getcwd(), "arXiv_processed", category)
-    logging.info(f"Processing category: {category}")
-
-    # Load corpus for the category
-    category_corpus = load_corpus(category_path)
-
-    if not category_corpus:
-        logging.warning(f"No documents found in category: {category}")
-        return
-
-    # Generate embeddings
-    category_embeddings = get_bert_embeddings(category_corpus, model, tokenizer)
-
-    # Save embeddings
-    category_output_path = os.path.join(output_root_path, category, "bert_embeddings.txt")
-    save_embeddings(category_embeddings, category_output_path)
-
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Generate BERT embeddings for a corpus.")
@@ -140,7 +113,7 @@ def main():
     args = parser.parse_args()
 
     # Define paths
-    root_dir = os.path.join(os.getcwd(), "arXiv_processed")
+    root_dir = os.path.join(os.getcwd(), "arXiv_processed_mitigated")
     output_root_path = os.path.join(os.getcwd(), "bert_embeddings")
 
     # Create embeddings directory if it doesn't exist
@@ -164,12 +137,6 @@ def main():
     
     # Save corpus-wide embeddings
     save_embeddings(corpus_embeddings, os.path.join(output_root_path, "bert_embeddings.txt"))
-
-    # Process each category
-    for category in os.listdir(root_dir):
-        category_path = os.path.join(root_dir, category)
-        if os.path.isdir(category_path):
-            process_category_embeddings(category, model, tokenizer, output_root_path)
 
     logging.info("BERT embedding generation completed successfully.")
 
