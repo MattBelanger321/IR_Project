@@ -93,8 +93,8 @@ def main():
 
     # Define paths
     root_dir = os.path.join(os.getcwd(), "arXiv_processed")
-    big_model_path = os.path.join(os.getcwd(), "embeddings", "word2vec.model")
-    output_root_path = os.path.join(os.getcwd(), "embeddings")
+    big_model_path = os.path.join(os.getcwd(), "word2vec_embeddings", "word2vec.model")
+    output_root_path = os.path.join(os.getcwd(), "word2vec_embeddings")
 
     # Create embeddings directory if it doesn't exist
     os.makedirs(output_root_path, exist_ok=True)
