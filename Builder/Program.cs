@@ -53,13 +53,13 @@ if (args.Length > 5)
 // Try and get if we should perform summarizing.
 if (args.Length > 6)
 {
-    _ = bool.TryParse(args[6], out rank);
+    _ = bool.TryParse(args[6], out summarize);
 }
 
 // Try and get if we should perform indexing.
 if (args.Length > 7)
 {
-    _ = bool.TryParse(args[7], out rank);
+    _ = bool.TryParse(args[7], out index);
 }
 
 // Try and get if we should reset the entire database.
