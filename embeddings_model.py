@@ -34,6 +34,14 @@ class EmbeddingsModel:
         """
         pass
 
+    def save(self, output: str) -> None:
+        """
+        Save the model.
+        :param output: The output folder to save to.
+        :return: Nothing.
+        """
+        pass
+
     def load(self, path: str) -> None:
         """
         Load the model from a path.
@@ -43,7 +51,7 @@ class EmbeddingsModel:
         if self.model is not None:
             self.name = os.path.splitext(os.path.basename(path))[0]
 
-    def sentence_vectors(self, corpus: list[list[str]]) -> list[float]:
+    def sentence_vectors(self, corpus: list[list[str]]) -> list:
         """
         Generate sentence vectors from the corpus.
         :param corpus: The corpus.
