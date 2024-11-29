@@ -40,7 +40,8 @@ class EmbeddingsModel:
         :param path: The path to load the model from.
         :return: Nothing.
         """
-        pass
+        if self.model is not None:
+            self.name = os.path.splitext(os.path.basename(path))[0]
 
     def sentence_vectors(self, corpus: list[list[str]]) -> list[float]:
         """
@@ -68,15 +69,19 @@ class EmbeddingsModel:
             logging.error(f"No model loaded.")
             return 0
         # Get the sentence embeddings.
+        logging.info(f"{self.name} | Getting sentence embeddings for the corpus...")
         embeddings = self.sentence_vectors(corpus)
         # Covert labels to integer values.
+        logging.info(f"{self.name} | Converting labels...")
         label_encoder = LabelEncoder()
         encoded_labels = label_encoder.fit_transform(labels)
         # Run classification.
+        logging.info(f"{self.name} | Running classification...")
         classifier = RandomForestClassifier(n_estimators=100, random_state=seed)
         classifier.fit(embeddings, encoded_labels)
         # Evaluate the classification.
         accuracy = accuracy_score(encoded_labels, classifier.predict(embeddings))
+        logging.info(f"{self.name} | Accuracy = {accuracy}")
         if not os.path.exists(output):
             os.mkdir(output)
         with open(os.path.join(output, f"{self.name}.txt"), "w") as file:

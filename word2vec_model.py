@@ -42,6 +42,7 @@ class Word2VecModel(EmbeddingsModel):
         path = os.path.join(output, f"{self.name}.txt")
         if os.path.exists(path):
             logging.info(f"Model '{path}' already exists.")
+            self.load(path)
             return
         # Fit the model.
         logging.info(f"Fitting '{path}'...")
@@ -74,7 +75,7 @@ class Word2VecModel(EmbeddingsModel):
             self.model = None
             return
         # If successful, update the name.
-        self.name = os.path.basename(path).split(".")[0]
+        super().load(path)
 
     def sentence_vectors(self, corpus: list[list[str]]) -> list[float]:
         """
