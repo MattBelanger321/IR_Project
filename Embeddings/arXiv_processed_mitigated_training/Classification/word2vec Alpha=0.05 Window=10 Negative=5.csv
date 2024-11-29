@@ -1,0 +1,4 @@
+Metric,Score
+Accuracy,0.5399
+Balanced Accuracy,0.3697792167598635
+Matthews Correlation Coefficient,0.5304305285910589
