@@ -6,6 +6,7 @@ from data_loader import load_data
 from e5_model import E5TransformerModel
 from embeddings_model import EmbeddingsModel
 from mini_model import MiniTransformerModel
+from naive_bayes_model import NaiveBayesModel
 from word2vec_model import Word2VecModel
 
 
@@ -47,6 +48,9 @@ def fit_best(directory: str = "arXiv_processed_mitigated", seed: int = 42,
     corpus, labels = load_data(directory)
     # Store all results.
     results = {}
+    # Run Naive Bayes.
+    nb = NaiveBayesModel()
+    results[nb.name] = evaluate_model(nb, corpus, labels, output, seed)
     # Run all-MiniLM-L6-v2.
     mini = MiniTransformerModel()
     results[mini.name] = evaluate_model(mini, corpus, labels, output, seed)

@@ -1,7 +1,9 @@
 import logging
 import os.path
+from typing import Any
 
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, matthews_corrcoef, \
     balanced_accuracy_score
@@ -46,19 +48,16 @@ class EmbeddingsModel:
         return embeddings
 
     def classify(self, corpus: list[list[str]], labels: list[str], output: str = "Embeddings",
-                 seed: int = 42) -> [float, float, float]:
+                 seed: int = 42, classifier: Any or None = None) -> [float, float, float]:
         """
         Perform classification on the model.
         :param corpus: The corpus.
         :param labels: The labels of the corpus.
         :param output: Where to save the results to.
         :param seed: The random seed.
+        :param classifier: The classifier to use.
         :return: The classification accuracy, balanced accuracy, and Matthews correlation coefficient.
         """
-        # Can't classify if there is no model.
-        if self.model is None:
-            logging.error(f"No model loaded.")
-            return 0
         # Get the sentence embeddings.
         logging.info(f"{self.name} | Getting sentence embeddings for the corpus...")
         embeddings = self.sentence_vectors(corpus)
@@ -70,7 +69,14 @@ class EmbeddingsModel:
         x_train, x_test, y_train, y_test = train_test_split(embeddings, encoded_labels,test_size=0.2, random_state=seed)
         # Run classification.
         logging.info(f"{self.name} | Running classification...")
-        classifier = LogisticRegression(solver="lbfgs", random_state=seed)
+        # If no classifier was passed, this is not for Naive Bayes.
+        if classifier is None:
+            classifier = LogisticRegression(solver="lbfgs", random_state=seed)
+        # Otherwise it is, so ensure the values are set.
+        else:
+            vectorizer = TfidfVectorizer()
+            x_train = vectorizer.fit_transform(x_train)
+            x_test = vectorizer.transform(x_test)
         classifier.fit(x_train, y_train)
         # Evaluate the classification.
         pred = classifier.predict(x_test)
