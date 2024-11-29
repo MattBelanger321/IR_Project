@@ -48,27 +48,14 @@ class Word2VecModel(EmbeddingsModel):
         logging.info(f"Fitting '{path}'...")
         self.model = Word2Vec(sentences=corpus, workers=os.cpu_count(), compute_loss=True, seed=seed, alpha=alpha,
                               window=window, negative=negative)
-        self.save(output)
-
-    def save(self, output: str) -> None:
-        """
-        Save the model.
-        :param output:
-        :return: Nothing.
-        """
-        if self.model is None:
-            logging.error(f"Word2Vec model not loaded.")
-            return
-        # Save the model.
         if not os.path.exists(output):
             os.mkdir(output)
-        path = os.path.join(output, f"{self.name}.txt")
         self.model.save(f"{path}")
         # Save the loss.
-        loss_output = f"{output}_Loss"
+        loss_output = os.path.join(output, "Loss")
         if not os.path.exists(loss_output):
             os.mkdir(loss_output)
-        with open(os.path.join(loss_output, f"{self.name}_loss.txt"), "w") as file:
+        with open(os.path.join(loss_output, f"{self.name}.txt"), "w") as file:
             file.write(str(self.model.get_latest_training_loss()))
         logging.info(f"Fit '{path}.txt' | Loss = {self.model.get_latest_training_loss()}")
 
@@ -87,7 +74,7 @@ class Word2VecModel(EmbeddingsModel):
             self.model = None
             return
         # If successful, update the name.
-        super().load(path)
+        self.name = os.path.splitext(os.path.basename(path))[0]
 
     def sentence_vectors(self, corpus: list[list[str]]) -> list:
         """

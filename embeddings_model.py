@@ -1,8 +1,10 @@
 import logging
 import os.path
 
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, matthews_corrcoef, \
+    balanced_accuracy_score
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -23,34 +25,6 @@ class EmbeddingsModel:
         self.name = "embeddings_model" if name is None else name
         self.model = None
 
-    def fit(self, corpus: list[list[str]], output: str = "Embeddings", seed: int = 42, params: dict = None) -> None:
-        """
-        Fit the model.
-        :param corpus: The corpus to fit on.
-        :param output: The output folder to save to.
-        :param seed: The random seed.
-        :param params: Any model parameters in a dictionary.
-        :return: Nothing.
-        """
-        pass
-
-    def save(self, output: str) -> None:
-        """
-        Save the model.
-        :param output: The output folder to save to.
-        :return: Nothing.
-        """
-        pass
-
-    def load(self, path: str) -> None:
-        """
-        Load the model from a path.
-        :param path: The path to load the model from.
-        :return: Nothing.
-        """
-        if self.model is not None:
-            self.name = os.path.splitext(os.path.basename(path))[0]
-
     def sentence_vectors(self, corpus: list[list[str]]) -> list:
         """
         Generate sentence vectors from the corpus.
@@ -62,15 +36,15 @@ class EmbeddingsModel:
             embeddings.append(0)
         return embeddings
 
-    def classify(self, corpus: list[list[str]], labels: list[str], output: str = "Classifications",
-                 seed: int = 42) -> float:
+    def classify(self, corpus: list[list[str]], labels: list[str], output: str = "Embeddings",
+                 seed: int = 42) -> [float, float, float]:
         """
         Perform classification on the model.
         :param corpus: The corpus.
         :param labels: The labels of the corpus.
         :param output: Where to save the accuracy result to.
         :param seed: The random seed.
-        :return: The classification accuracy.
+        :return: The classification accuracy, balanced accuracy, and Matthews correlation coefficient.
         """
         # Can't classify if there is no model.
         if self.model is None:
@@ -88,10 +62,45 @@ class EmbeddingsModel:
         classifier = RandomForestClassifier(n_estimators=100, random_state=seed)
         classifier.fit(embeddings, encoded_labels)
         # Evaluate the classification.
-        accuracy = accuracy_score(encoded_labels, classifier.predict(embeddings))
-        logging.info(f"{self.name} | Accuracy = {accuracy}")
+        pred = classifier.predict(embeddings)
+        accuracy = accuracy_score(encoded_labels, pred)
+        cf = confusion_matrix(encoded_labels, pred)
+        report = classification_report(encoded_labels, pred, output_dict=True)
+        mcc = matthews_corrcoef(encoded_labels, pred)
+        balanced = balanced_accuracy_score(encoded_labels, pred)
+        logging.info(f"{self.name} | Accuracy = {accuracy} | Balanced Accuracy = {balanced} | Matthews Correlation "
+                     f"Coefficient = {mcc}")
+        # Ensure the root folder exists.
         if not os.path.exists(output):
             os.mkdir(output)
-        with open(os.path.join(output, f"{self.name}.txt"), "w") as file:
-            file.write(str(accuracy))
-        return accuracy
+        output = os.path.join(output, "Classification")
+        if not os.path.exists(output):
+            os.mkdir(output)
+        with open(os.path.join(output, f"{self.name}.csv"), "w") as file:
+            file.write((f"Metric,Score"
+                        f"\nAccuracy,{accuracy}"
+                        f"\nBalanced Accuracy,{balanced}"
+                        f"\nMatthews Correlation Coefficient,{mcc}"))
+        # Make names better.
+        report_index = {"accuracy": "Accuracy", "macro avg": "Macro Average", "weighted avg": "Weighted Average"}
+        report_columns = {"precision": "Precision", "recall": "Recall", "f1-score": "F1", "support": "Support"}
+        confusion_entries = []
+        n = len(label_encoder.classes_)
+        for i in range(n):
+            value = label_encoder.inverse_transform([i])[0]
+            report_index[str(i)] = value
+            confusion_entries.append(value)
+        # Save the classification report.
+        metric_output = os.path.join(output, "Classification Report")
+        if not os.path.exists(metric_output):
+            os.mkdir(metric_output)
+        df = pd.DataFrame(report).transpose()
+        df = df.rename(index=report_index, columns=report_columns)
+        df.to_csv(os.path.join(metric_output, f"{self.name}.csv"), index=True)
+        # Save the confusion matrix.
+        metric_output = os.path.join(output, "Confusion Matrix")
+        if not os.path.exists(metric_output):
+            os.mkdir(metric_output)
+        df = pd.DataFrame(cf, index=confusion_entries, columns=confusion_entries)
+        df.to_csv(os.path.join(metric_output, f"{self.name}.csv"))
+        return accuracy, balanced, mcc
