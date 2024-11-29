@@ -65,10 +65,12 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
     /// <param name="mitigate">If we should run mitigation.</param>
     /// <param name="cluster">If we should run clustering.</param>
     /// <param name="rank">If we should run PageRank.</param>
+    /// <param name="summarize">If we should run summarzing.</param>
+    /// <param name="index">If we should run indexing.</param>
     /// <param name="startingCategory">What category to start with.</param>
     /// <param name="startingOrder">What ordering to start with.</param>
     /// <param name="startingBy">What direction to start with.</param>
-    public static async Task Scrape(int totalResults = ArXiv.TotalResults, float discard = 0, double dampingFactor = PageRank.DampingFactor, int min = 5, int? max = 5, float training = 0.1f, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double? similarityThreshold = null, bool mitigate = true, bool cluster = true, bool rank = true, string? startingCategory = null, string? startingOrder = null, string? startingBy = null)
+    public static async Task Scrape(int totalResults = ArXiv.TotalResults, float discard = 0, double dampingFactor = PageRank.DampingFactor, int min = 5, int? max = 5, float training = 0.1f, int iterations = PageRank.Iterations, double tolerance = PageRank.Tolerance, bool reset = false, double? similarityThreshold = null, bool mitigate = true, bool cluster = true, bool rank = true, bool summarize = true, bool index = true, string? startingCategory = null, string? startingOrder = null, string? startingBy = null)
     {
         // Get all the documents to build our dataset.
         await ArXiv.Scrape(totalResults, startingCategory, startingOrder, startingBy);
@@ -92,9 +94,15 @@ public class ScrappingService(ILogger<ScrappingService> logger) : BackgroundServ
         Dictionary<string, double> ranks = rank ? await PageRank.Perform(dampingFactor, iterations, tolerance, clusters) : await PageRank.Load();
 
         // Summarize documents.
-        await Ollama.Summarize();
+        if (summarize)
+        {
+            await Ollama.Summarize();
+        }
 
         // Index our files.
-        await Embeddings.Index(reset, similarityThreshold, ranks);
+        if (index)
+        {
+            await Embeddings.Index(reset, similarityThreshold, ranks);
+        }
     }
 }
