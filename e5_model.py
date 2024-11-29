@@ -1,4 +1,4 @@
-from AutoTransformerModel import AutoTransformerModel
+from auto_transformer_model import AutoTransformerModel
 
 
 class E5TransformerModel(AutoTransformerModel):
