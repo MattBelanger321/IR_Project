@@ -16,33 +16,33 @@ class Word2VecModel(EmbeddingsModel):
     word2vec model.
     """
 
-    def __init__(self):
+    def __init__(self, corpus: list[list[str]], output: str = "Embeddings", seed: int = 42, alpha: float = 0.025,
+                 window: int = 5, negative: int = 5):
         """
         Initialize the word2vec model.
-        """
-        super().__init__("word2vec")
-
-    def fit(self, corpus: list[list[str]], output: str = "Embeddings", seed: int = 42, params: dict = None) -> None:
-        """
-        Fit the model.
         :param corpus: The corpus to fit on.
         :param output: The output folder to save to.
         :param seed: The random seed.
-        :param params: Any model parameters in a dictionary.
-        :return: Nothing.
+        :param alpha: The alpha learning value.
+        :param window: The word window.
+        :param negative: The negative window.
         """
-        # Define standard parameters if none are passed.
-        if params is None:
-            params = {}
-        alpha = params["Alpha"] if "Alpha" in params else 0.025
-        window = params["Window"] if "Window" in params else 5
-        negative = params["Negative"] if "Negative" in params else 5
-        # If the model already exists, there is nothing to do.
-        self.name = f"word2vec_alpha-{alpha}_window-{window}_negative-{negative}"
+        super().__init__(f"word2vec Alpha={alpha} Window={window} Negative={negative}")
+        # The "parameters" for sorting are given by larger hyperparameters.
+        self.parameters = alpha + window + negative
         path = os.path.join(output, f"{self.name}.txt")
+        # If the model already exists, try loading it.
         if os.path.exists(path):
             logging.info(f"Model '{path}' already exists.")
-            self.load(path)
+            try:
+                self.model = Word2Vec.load(path)
+            # Revert if it fails.
+            except Exception as e:
+                logging.error(f"Error loading '{path}' as a Word2Vec model: {e}")
+                self.model = None
+                return
+            # If successful, update the name.
+            self.name = os.path.splitext(os.path.basename(path))[0]
             return
         # Fit the model.
         logging.info(f"Fitting '{path}'...")
@@ -58,23 +58,6 @@ class Word2VecModel(EmbeddingsModel):
         with open(os.path.join(loss_output, f"{self.name}.txt"), "w") as file:
             file.write(str(self.model.get_latest_training_loss()))
         logging.info(f"Fit '{path}.txt' | Loss = {self.model.get_latest_training_loss()}")
-
-    def load(self, path: str) -> None:
-        """
-        Load the model from a path.
-        :param path: The path to load the model from.
-        :return: Nothing.
-        """
-        # Try to load the model.
-        try:
-            self.model = Word2Vec.load(path)
-        # Revert if it fails.
-        except Exception as e:
-            logging.error(f"Error loading '{path}' as a Word2Vec model: {e}")
-            self.model = None
-            return
-        # If successful, update the name.
-        self.name = os.path.splitext(os.path.basename(path))[0]
 
     def sentence_vectors(self, corpus: list[list[str]]) -> list:
         """

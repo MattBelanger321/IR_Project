@@ -2,9 +2,10 @@ import logging
 import os.path
 
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, matthews_corrcoef, \
     balanced_accuracy_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -24,6 +25,14 @@ class EmbeddingsModel:
         """
         self.name = "embeddings_model" if name is None else name
         self.model = None
+        self.parameters = 0
+
+    def __str__(self) -> str:
+        """
+        Convert to a string.
+        :return: The name.
+        """
+        return self.name
 
     def sentence_vectors(self, corpus: list[list[str]]) -> list:
         """
@@ -42,7 +51,7 @@ class EmbeddingsModel:
         Perform classification on the model.
         :param corpus: The corpus.
         :param labels: The labels of the corpus.
-        :param output: Where to save the accuracy result to.
+        :param output: Where to save the results to.
         :param seed: The random seed.
         :return: The classification accuracy, balanced accuracy, and Matthews correlation coefficient.
         """
@@ -57,17 +66,19 @@ class EmbeddingsModel:
         logging.info(f"{self.name} | Converting labels...")
         label_encoder = LabelEncoder()
         encoded_labels = label_encoder.fit_transform(labels)
+        # Do a train-test split.
+        x_train, x_test, y_train, y_test = train_test_split(embeddings, encoded_labels,test_size=0.2, random_state=seed)
         # Run classification.
         logging.info(f"{self.name} | Running classification...")
-        classifier = RandomForestClassifier(n_estimators=100, random_state=seed)
-        classifier.fit(embeddings, encoded_labels)
+        classifier = LogisticRegression(solver="lbfgs", random_state=seed)
+        classifier.fit(x_train, y_train)
         # Evaluate the classification.
-        pred = classifier.predict(embeddings)
-        accuracy = accuracy_score(encoded_labels, pred)
-        cf = confusion_matrix(encoded_labels, pred)
-        report = classification_report(encoded_labels, pred, output_dict=True)
-        mcc = matthews_corrcoef(encoded_labels, pred)
-        balanced = balanced_accuracy_score(encoded_labels, pred)
+        pred = classifier.predict(x_test)
+        accuracy = accuracy_score(y_test, pred)
+        cf = confusion_matrix(y_test, pred)
+        report = classification_report(y_test, pred, output_dict=True)
+        mcc = matthews_corrcoef(y_test, pred)
+        balanced = balanced_accuracy_score(y_test, pred)
         logging.info(f"{self.name} | Accuracy = {accuracy} | Balanced Accuracy = {balanced} | Matthews Correlation "
                      f"Coefficient = {mcc}")
         # Ensure the root folder exists.

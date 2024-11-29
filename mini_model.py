@@ -8,3 +8,4 @@ class MiniTransformerModel(AutoTransformerModel):
         :param max_length: The max input length.
         """
         super().__init__("sentence-transformers", "all-MiniLM-L6-v2", max_length)
+        self.parameters = 22700000

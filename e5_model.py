@@ -8,3 +8,4 @@ class E5TransformerModel(AutoTransformerModel):
         :param max_length: The max input length.
         """
         super().__init__("intfloat", "e5-small-v2", max_length)
+        self.parameters = 33400000
