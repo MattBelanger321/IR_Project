@@ -419,20 +419,24 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Do not keep the arXiv data.
-arXiv/
-arXiv_summaries/
-arXiv_processed/
-arXiv_processed_mitigated/
-arXiv_clustering/
-arXiv_mitigated/
-page_rank.csv
-clustering.csv
-mitigated.txt
-
 # Python Virtual Environment
 venv/
 
 # VS Code Cache
 .vscode/
 *.png
+
+# Do not keep the arXiv data.
+arXiv/
+arXiv_summaries/
+arXiv_processed/
+arXiv_processed_mitigated/
+arXiv_processed_mitigated_training/
+arXiv_clustering/
+arXiv_mitigated/
+page_rank.csv
+clustering.csv
+mitigated.txt
+embeddings.txt
+word2vec_embeddings/
+bert_embeddings/
