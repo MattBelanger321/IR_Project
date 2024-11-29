@@ -15,37 +15,69 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def evaluate_model(model: EmbeddingsModel, corpus: list[list[str]], labels: list[str], output: str = "Embeddings",
                    seed: int = 42) -> {str: float}:
+    """
+    Get the evaluations for a model.
+    :param model: The model being evaluated.
+    :param corpus: The corpus.
+    :param labels: The labels.
+    :param output: Where to save the results to.
+    :param seed: The random seed.
+    :return: The evaluations for the model.
+    """
     accuracy, balanced, mcc = model.classify(corpus, labels, output, seed)
     return {"Accuracy": accuracy, "Balanced": balanced, "MCC": mcc, "Parameters": model.parameters}
 
 
 def fit_best(directory: str = "arXiv_processed_mitigated", seed: int = 42,
              alphas: list or float = 0.025, windows: list or int = 5, negatives: int or None = 5) -> None:
+    """
+    Determine the best fitting model.
+    :param directory: The directory to load the corpus from.
+    :param seed: The random seed.
+    :param alphas: word2vec alpha values.
+    :param windows: word2vec window values.
+    :param negatives: word2vec negative values.
+    :return: Nothing.
+    """
+    # Create the output directory.
     if not os.path.exists("Embeddings"):
         os.mkdir("Embeddings")
     output = os.path.join("Embeddings", os.path.basename(directory))
-    results = {}
+    # Load the corpus.
     corpus, labels = load_data(directory)
+    # Store all results.
+    results = {}
+    # Run all-MiniLM-L6-v2.
     mini = MiniTransformerModel()
     results[mini.name] = evaluate_model(mini, corpus, labels, output, seed)
+    # Run e5-small-v2.
     e5 = E5TransformerModel()
     results[e5.name] = evaluate_model(e5, corpus, labels, output, seed)
+    # Run the standard word2vec.
+    w2v_standard = Word2VecModel(corpus, output, seed)
+    results[f"{w2v_standard.name} - Standard"] = evaluate_model(w2v_standard, corpus, labels, output, seed)
+    # Ensure fine-tuned word2vec models parameters are valid.
     if not isinstance(alphas, list):
         alphas = [alphas]
     if not isinstance(windows, list):
         windows = [windows]
     if not isinstance(negatives, list):
         negatives = [negatives]
+    # Try all possible combinations.
     for alpha in alphas:
         for window in windows:
             for negative in negatives:
                 logging.info(f"word2vec | Alpha = {alpha} | Window = {window} | Negative = {negative}")
                 w2v = Word2VecModel(corpus, output, seed, alpha, window, negative)
-                results[w2v.name] = evaluate_model(w2v, corpus, labels, output, seed)
+                # If this model was the same as the standard version, skip it.
+                if w2v.name != w2v_standard.name:
+                    results[w2v.name] = evaluate_model(w2v, corpus, labels, output, seed)
+    # Sort the results by best performing.
     results = dict(sorted(
         results.items(),
         key=lambda item: (-item[1]["Accuracy"], -item[1]["Balanced"], -item[1]["MCC"], item[1]["Parameters"], item[0])
     ))
+    # Write the results to a CSV.
     s = "Model,Accuracy,Balanced Accuracy,Matthews Correlation Coefficient"
     for result in results:
         s += f"\n{result},{results[result]['Accuracy']},{results[result]['Balanced']},{results[result]['MCC']}"
