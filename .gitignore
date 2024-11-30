@@ -426,16 +426,12 @@ venv/
 .vscode/
 *.png
 
-# Do not keep the arXiv data.
+# Do not keep the arXiv data other than clustering and mitigation results as there is so much.
 /arXiv
 /arXiv_training
 /arXiv_summaries
 /arXiv_summaries_training
 /arXiv_processed
 /arXiv_processed_training
-/arXiv_mitigated
-/arXiv_mitigated_training
 /arXiv_processed_mitigated
 /arXiv_processed_mitigated_training
-/arXiv_clustering
-/arXiv_clustering_training

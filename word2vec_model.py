@@ -31,26 +31,13 @@ class Word2VecModel(EmbeddingsModel):
         # The "parameters" for sorting are given by larger hyperparameters.
         self.parameters = alpha + window + negative
         path = os.path.join(output, f"{self.name}.txt")
-        # If the model already exists, try loading it.
-        if os.path.exists(path):
-            logging.info(f"Model '{path}' already exists.")
-            try:
-                self.model = Word2Vec.load(path)
-            # Revert if it fails.
-            except Exception as e:
-                logging.error(f"Error loading '{path}' as a Word2Vec model: {e}")
-                self.model = None
-                return
-            # If successful, update the name.
-            self.name = os.path.splitext(os.path.basename(path))[0]
-            return
         # Fit the model.
         logging.info(f"Fitting '{path}'...")
         self.model = Word2Vec(sentences=corpus, workers=os.cpu_count(), compute_loss=True, seed=seed, alpha=alpha,
                               window=window, negative=negative)
         if not os.path.exists(output):
             os.mkdir(output)
-        self.model.save(f"{path}")
+        self.model.wv.save_word2vec_format(path, binary=False)
         # Save the loss.
         loss_output = os.path.join(output, "Loss")
         if not os.path.exists(loss_output):
