@@ -1,7 +1,7 @@
 ﻿using SearchEngine.Server;
 
 // Default values.
-int totalResults = 5000000;
+int totalResults = 100000;
 int min = 5;
 int max = 5;
 bool mitigate = true;

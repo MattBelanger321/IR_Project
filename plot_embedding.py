@@ -1,169 +1,120 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-import os
 import argparse
 import logging
+import os
+from typing import Any
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 
-matplotlib.use('TkAgg')  # Set the backend to a GUI-compatible option
+# Set the backend to a GUI-compatible option.
+matplotlib.use("TkAgg")
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def load_data(file_path):
-    """Load data from a file."""
-    logging.info(f"Loading data from {file_path}...")
-    
-    if not os.path.exists(file_path):
-        logging.error(f"File not found: {file_path}")
-        return np.array([]), []
-    
-    lines = read_file(file_path)
 
-    if not lines:
-        logging.error(f"File is empty: {file_path}")
-        return np.array([]), []
-    
-    return parse_lines(lines)
-
-def read_file(file_path):
-    """Read all lines from a file."""
-    with open(file_path, 'r') as file:
-        return file.readlines()
-
-def parse_lines(lines):
-    """Parse lines from the file into labels and data."""
-    labels = []
-    data = []
-    
-    for line in lines[1:]:  # Skip the first line for metadata
-        parts = line.strip().split()
-        if not is_valid_line(parts):
-            logging.warning(f"Skipping invalid line: {line.strip()}")
-            continue
-        
-        label, vector = extract_label_and_vector(parts)
-        labels.append(label)
-        data.append(vector)
-
-    return convert_to_numpy(data, labels)
-
-def is_valid_line(parts):
-    """Check if the line has at least one label and one vector component."""
-    return len(parts) >= 2
-
-def extract_label_and_vector(parts):
-    """Extract the label and vector from the parts."""
-    label = parts[0]  # First element is the label
-    vector = list(map(float, parts[1:]))  # Remaining elements are the vector
-    return label, vector
-
-def convert_to_numpy(data, labels):
-    """Convert data list to a numpy array and log the result."""
-    data_array = np.array(data)
-
-    if data_array.size == 0:
-        logging.error("No valid data points found in the file.")
-        return data_array, labels
-
-    logging.info(f"Loaded {len(data_array)} data points with {len(data_array[0])} dimensions.")
-    return data_array, labels
-
-def preprocess_data(data):
-    """Standardize the data."""
-    logging.info("Standardizing the data...")
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(data)
-    logging.info("Data standardized.")
-    return scaled_data
-
-def perform_pca(data, n_components=2):
-    """Perform PCA on the data."""
-    logging.info("Performing PCA...")
-    pca = PCA(n_components=n_components)
-    reduced_data = pca.fit_transform(data)
-    logging.info("PCA completed.")
-    return reduced_data
-
-def perform_tsne(data, n_components=2, perplexity=20):
-    """Perform t-SNE on the data."""
-    logging.info(f"Performing t-SNE with perplexity={perplexity}...")
-    tsne = TSNE(n_components=n_components, perplexity=perplexity)
-    reduced_data = tsne.fit_transform(data)
-    logging.info("t-SNE completed.")
-    return reduced_data
-
-def plot(reduced_data, labels, output_file, title):
-    """Plot the reduced data with labels and save it to a PNG file."""
-    logging.info(f"Plotting and saving the output to {output_file}...")
-    plt.figure(figsize=(100, 100))
-    scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], alpha=0.7)
-
-    # Adding labels to points
-    for i, label in enumerate(labels):
-        plt.annotate(label, (reduced_data[i, 0], reduced_data[i, 1]), fontsize=8, alpha=0.6)
-
+def save_plot(data: Any, labels: Any, output: str, title: str, do_labels: bool = True, size: float = 100) -> None:
+    """
+    Save a plot to a PNG.
+    :param data: The data to plot.
+    :param labels: The corresponding labels.
+    :param output: The file to save to.
+    :param title: The title of the plot.
+    :param do_labels: If labels should be added.
+    :param size: The size of the plots.
+    :return: Nothing.
+    """
+    if size < 0:
+        size = -size
+    elif size == 0:
+        size = 1
+    plt.figure(figsize=(size, size))
+    plt.scatter(data[:, 0], data[:, 1], alpha=0.7)
+    # Adding labels to points.
+    if do_labels:
+        for i, label in enumerate(labels):
+            plt.annotate(label, (data[i, 0], data[i, 1]), fontsize=8, alpha=0.6)
+    # Add titles to the plot.
     plt.title(title)
-    plt.xlabel('Component 1')
-    plt.ylabel('Component 2')
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
     plt.grid()
-    plt.savefig(f"{output_file}.png", format='png')
-    logging.info(f"Plot saved as {output_file}.png")
+    path = os.path.join(output, f"{title}.png")
+    plt.savefig(path)
+    logging.info(f"Saved plot '{path}'.")
+    # Close the plot from memory after it is saved.
     plt.close()
 
-def get_file_path(category):
-    """Get the file path for the embeddings based on the selected category."""
-    base_dir = os.path.join(os.getcwd(), "embeddings")
-    
-    if category:
-        category_path = os.path.join(base_dir, category)
-        if not os.path.exists(category_path):
-            available_categories = os.listdir(base_dir)
-            logging.error(f"Category '{category}' does not exist. Available categories: {', '.join(available_categories)}")
-            raise ValueError(f"Invalid category '{category}'. Available categories: {', '.join(available_categories)}")
-        return os.path.join(category_path, "embeddings.txt")
-    
-    return os.path.join(base_dir, "embeddings.txt")  # Path for big model
 
-def main():
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Perform PCA or t-SNE on a dataset.")
-    parser.add_argument('--method', choices=['pca', 'tsne'], required=True, help="Analysis method: PCA or t-SNE.")
-    parser.add_argument('--output', type=str, default='output', help="Output PNG file name (without extension).")
-    parser.add_argument('--category', type=str, help="Select a category for analysis.")
-    parser.add_argument('--perplexity', type=int, default=20, help="Perplexity for t-SNE (default: 20).")
-
-    args = parser.parse_args()
-
-    # Get file path based on the specified category
-    try:
-        file_path = get_file_path(args.category)
-    except ValueError as e:
-        logging.error(str(e))
+def plot_embeddings(embeddings: str = "embeddings.txt", output: str = "Plots", perplexity: int = 20,
+                    do_labels: bool = True, size: float = 100) -> None:
+    """
+    Perform PCA and t-SNE.
+    :param embeddings: The embeddings file to use.
+    :param output: The folder to output plots to.
+    :param perplexity: Perplexity for t-SNE.
+    :param do_labels: If labels should be added.
+    :param size: The size of the plots.
+    :return: Nothing.
+    """
+    # Nothing to do if the embeddings file does not exist.
+    if not os.path.exists(embeddings):
+        logging.error(f"'{embeddings}' does not exist.")
         return
-
-    data, labels = load_data(file_path)
+    # Load the data.
+    logging.info(f"Loading data from {embeddings}...")
+    with open(embeddings, "r") as file:
+        lines = file.readlines()
+    labels = []
+    data = []
+    # Skip the first line for metadata.
+    for line in lines[1:]:
+        parts = line.strip().split()
+        # Check if the line has at least one label and one vector component.
+        if len(parts) < 2:
+            logging.warning(f"Skipping invalid line: {line.strip()}")
+            continue
+        # First element is the label.
+        labels.append(parts[0])
+        # Remaining elements are the vector.
+        data.append(list(map(float, parts[1:])))
+    # Covert to a numpy array.
+    data = np.array(data)
+    # Nothing to do if there were no valid entries.
     if data.size == 0:
-        logging.error("No data to process. Exiting.")
+        logging.error(f"'{embeddings}' does not have any data.")
         return
+    logging.info(f"Loaded {len(data)} data points with {len(data[0])} dimensions.")
+    # Ensure the data is standardized.
+    logging.info("Standardizing the data...")
+    data = StandardScaler().fit_transform(data)
+    # Create the output folder.
+    if not os.path.exists(output):
+        os.mkdir(output)
+    # Perform PCA.
+    logging.info("Performing PCA...")
+    reduced = PCA(n_components=2).fit_transform(data)
+    logging.info("Plotting PCA...")
+    save_plot(reduced, labels, output, "PCA", do_labels, size)
+    # Perform t-SNE.
+    perplexity = max(1, perplexity)
+    logging.info(f"Performing t-SNE with perplexity={perplexity}...")
+    reduced = TSNE(n_components=2, perplexity=perplexity).fit_transform(data)
+    logging.info("Plotting t-SNE...")
+    save_plot(reduced, labels, output, f"t-SNE with perplexity of {perplexity}", do_labels, size)
 
-    numeric_data = preprocess_data(data)
-
-    # Perform PCA or t-SNE based on the user's choice
-    title = ""
-    reduced_data = []
-    if args.method == 'pca':
-        reduced_data = perform_pca(numeric_data)
-        title = 'PCA Analysis'
-    elif args.method == 'tsne':
-        reduced_data = perform_tsne(numeric_data, perplexity=args.perplexity)
-        title = 't-SNE Analysis'
-
-    plot(reduced_data, labels, args.output, title=title)
 
 if __name__ == "__main__":
-    main()
+    # Parse arguments.
+    parser = argparse.ArgumentParser(description="Perform PCA and t-SNE")
+    parser.add_argument("-e", "--embeddings", type=str, default="embeddings.txt", help="The embeddings file to use.")
+    parser.add_argument("-o", "--output", type=str, default="Plots", help="The folder to output plots to.")
+    parser.add_argument("-p", "--perplexity", type=int, default=20, help="Perplexity for t-SNE.")
+    parser.add_argument("-s", "--size", type=float, default=100, help="The size of the plots.")
+    parser.add_argument("-n", "--no-labels", action="store_false", help="Disable labels.")
+    args = parser.parse_args()
+    plot_embeddings(args.embeddings, args.output, args.perplexity, args.no_labels, args.size)

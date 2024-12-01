@@ -122,7 +122,7 @@ public static class Ollama
             {
                 Directory.CreateDirectory(categoryPath);
             }
-            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), SearchEngine.Server.ArXiv.CleanString(response));
+            await File.WriteAllTextAsync(Path.Combine(categoryPath, $"{id}.txt"), ArXiv.CleanString(response).Replace("Here is a summary of the article in one sentence: ", string.Empty));
             existing.Add(id);
         }
 

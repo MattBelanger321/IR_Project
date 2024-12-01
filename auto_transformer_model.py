@@ -17,14 +17,3 @@ class AutoTransformerModel(TransformerModel):
         self.tokenizer = AutoTokenizer.from_pretrained(temp)
         self.max_length = max_length
         self.embeddings = None
-
-    def load(self, path: str) -> None:
-        """
-        Reset the model.
-        :param path: The unused path.
-        :return: Nothing.
-        """
-        temp = f"{self.root}/{self.name}"
-        self.model = AutoModel.from_pretrained(temp)
-        self.tokenizer = AutoTokenizer.from_pretrained(temp)
-        self.embeddings = None
