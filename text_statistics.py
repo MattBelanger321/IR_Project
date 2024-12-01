@@ -47,16 +47,26 @@ def save_plot(data: list, title: str, x_label: str, y_label: str, path: str, x: 
     plt.close(fig)
 
 
-def perform(directory: str, output: str, x: int = 10, y: int = 5) -> None:
+def main(directory: str = "arXiv_processed", output: str = "Text Statistics", x: int = 10, y: int = 5) -> None:
     """
-    Calculate the Heaps' and Zipf's laws.
-    :param directory: The folder to run these statistics on.
+    Run text statistics on all categories together and each one individually.
+    :param directory: The root folder to run these statistics on.
     :param output: The output directory to save to.
     :param x: The width of figures.
     :param y: The height of figures.
     :return: Nothing.
     """
-    logging.info(f"Determining text statistics for: {directory}")
+    # Ensure the directory exists.
+    if not os.path.exists(directory):
+        logging.error(f"Directory '{directory}' does not exist.")
+        return
+    # Create the output directory.
+    if not os.path.exists(output):
+        os.mkdir(output)
+    output = os.path.join(output, directory)
+    if not os.path.exists(output):
+        os.mkdir(output)
+    logging.info(f"Determining text statistics for '{directory}'...")
     # Define the structures to hold the data.
     zipf = {}
     heaps = []
@@ -67,7 +77,7 @@ def perform(directory: str, output: str, x: int = 10, y: int = 5) -> None:
         if not filepath.is_file():
             continue
         with filepath.open("r") as file:
-            # Check every word in the text, running preprocessing to normalize and remove accents..
+            # Check every word in the text, running preprocessing to normalize and remove accents.
             for word in preprocess(file.read()):
                 # If the word exists, increment the number of occurrences.
                 if word in zipf:
@@ -78,8 +88,6 @@ def perform(directory: str, output: str, x: int = 10, y: int = 5) -> None:
                     total += 1
             # Keep track of how many heaps instances we have.
             heaps.append(total)
-    # Get the name for the files we will be saving to.
-    name = os.path.basename(directory)
     # Get the top occurring words and counts.
     zipf_words = sorted(zipf, key=zipf.get, reverse=True)
     zipf_counts = sorted(zipf.values(), reverse=True)
@@ -88,46 +96,27 @@ def perform(directory: str, output: str, x: int = 10, y: int = 5) -> None:
     n = len(zipf_words)
     for i in range(n):
         s += f"\n{zipf_words[i]},{zipf_counts[i]}"
-    with open(os.path.join(output, f"{name}.csv"), "w") as file:
+    path = os.path.join(output, f"Frequencies.csv")
+    with open(path, "w") as file:
         file.write(s)
+    logging.info(f"Frequencies saved to '{path}'.")
     # Plot Heaps law.
-    save_plot(heaps, f"{name} Heaps' Law", "Number of Documents (log10)", "Number of Terms (log10)",
-              os.path.join(output, f"{name} Heaps.png"), x, y)
+    path = os.path.join(output, f"Heaps Law.png")
+    save_plot(heaps, f"Heaps' Law", "Number of Documents (log10)", "Number of Terms (log10)", path,
+              x, y)
+    logging.info(f"Heaps' Law plot saved to '{path}'.")
     # Plot Zipf's law.
-    save_plot(zipf_counts, f"{name} Zipf's Law", "Rank (log10)", "Collection Frequency (log10)",
-              os.path.join(output, f"{name} Zipf.png"), x, y)
-
-
-def main(directory: str, output: str, x: int = 10, y: int = 5) -> None:
-    """
-    Run text statistics on all categories together and each one individually.
-    :param directory: The root folder to run these statistics on.
-    :param output: The output directory to save to.
-    :param x: The width of figures.
-    :param y: The height of figures.
-    :return: Nothing.
-    """
-    # Ensure the directory exists.
-    directory = os.path.join(os.getcwd(), directory)
-    if not os.path.exists(directory):
-        logging.error(f"Root directory '{directory}' does not exist.")
-        return
-    output = os.path.join(os.getcwd(), output)
-    if not os.path.exists(output):
-        os.mkdir(output)
-    logging.info(f"Saving text statistics to: {output}")
-    # Perform across all categories.
-    perform(directory, output, x, y)
-    # Perform on each category individually.
-    for category in os.listdir(directory):
-        category = os.path.join(directory, category)
-        if os.path.isdir(category):
-            perform(category, output, x, y)
+    path = os.path.join(output, f"Zipfs Law.png")
+    save_plot(zipf_counts, f"Zipf's Law", "Rank (log10)", "Collection Frequency (log10)", path, x, y)
+    logging.info(f"Zipf's Law plot saved to '{path}'.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Text Statistics")
-    parser.add_argument("directory", type=str, help="The root folder to run these statistics on.")
-    parser.add_argument("output", type=str, help="The output directory to save to.")
+    parser.add_argument("-d", "--directory", type=str, default="arXiv_processed", help="The root folder to run these "
+                                                                                       "statistics on.")
+    parser.add_argument("-o", "--output", type=str, default="Text Statistics", help="The output directory to save to.")
+    parser.add_argument("-x", "--width", type=float, default=10, help="The output width.")
+    parser.add_argument("-y", "--height", type=float, default=5, help="The output height.")
     args = parser.parse_args()
-    main(args.directory, args.output)
+    main(args.directory, args.output, args.width, args.height)

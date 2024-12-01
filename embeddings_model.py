@@ -66,7 +66,8 @@ class EmbeddingsModel:
         label_encoder = LabelEncoder()
         encoded_labels = label_encoder.fit_transform(labels)
         # Do a train-test split.
-        x_train, x_test, y_train, y_test = train_test_split(embeddings, encoded_labels,test_size=0.2, random_state=seed)
+        x_train, x_test, y_train, y_test = train_test_split(embeddings, encoded_labels, test_size=0.2,
+                                                            random_state=seed)
         # Run classification.
         logging.info(f"{self.name} | Running classification...")
         # If no classifier was passed, this is not for Naive Bayes.
