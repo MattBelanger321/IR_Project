@@ -530,6 +530,7 @@ public static partial class Embeddings
 
         // Iterate over all files in our dataset.
         string[] files = Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories);
+        
         List<PointStruct> points = [];
         for (int i = 0; i < files.Length; i++)
         {
@@ -598,6 +599,16 @@ public static partial class Embeddings
         {
             return;
         }
+
+        // Sort the points, as the insert order may help with default returns.
+        points = points.OrderByDescending(x => x.Payload[ScoreKey].DoubleValue)
+            .ThenByDescending(x => x.Payload[UpdatedKey].StringValue)
+            .ThenByDescending(x => x.Payload[TitleKey].StringValue)
+            .ThenByDescending(x => x.Payload[IdKey].StringValue)
+            .ThenBy(x => x.Payload[TitleKey].StringValue)
+            .ThenBy(x => x.Payload[AuthorsKey].StringValue)
+            .ThenBy(x => x.Payload[SummaryKey].StringValue)
+            .ThenBy(x => x.Id.Uuid).ToList();
         
         // Update our values into the vector database.
         UpdateResult updateResult = await VectorDatabase.UpsertAsync(VectorCollectionName, points);
