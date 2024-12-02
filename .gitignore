@@ -424,7 +424,6 @@ venv/
 
 # VS Code Cache
 .vscode/
-*.png
 
 # Do not keep the arXiv data other than clustering and mitigation results as there is so much.
 /arXiv
